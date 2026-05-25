@@ -10,6 +10,8 @@ export default defineConfig({
   plugins: [
     devServer({ entry: "api/boot.ts", exclude: [/^\/(?!api\/).*$/] }),
     inspectAttr(), react()],
+  base: '/fx-trading-ledger/',
+  
   server: {
     port: 3000,
   },
