@@ -9,18 +9,22 @@ import {
 } from "./db";
 
 function toDate(val: unknown): string | null {
-  if (!val || val === "NaT") return null;
+  if (!val || val === "NaT" || val === "null" || val === "undefined") return null;
   if (val instanceof Date) return val.toISOString();
-  // Handle Excel date serial numbers
   if (typeof val === "number") {
-    // Excel epoch is 1899-12-30, but JS epoch is 1970-01-01
-    // Excel serial 1 = 1899-12-31, 25569 = 1970-01-01
-    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-    const daysSinceEpoch = val;
-    const jsDate = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
-    if (!isNaN(jsDate.getTime())) return jsDate.toISOString();
+    // Excel date serial numbers are typically in range 1-100000 (1900-2200)
+    // Financial figures like notionals/prices are usually >1M or <0.001, 
+    // or very small integers (1-100). Use range check to avoid misclassifying.
+    if (val > 30000 && val < 100000) {
+      // Excel epoch is 1899-12-30 (with 1900 leap year bug compatibility)
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      const jsDate = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
+      if (!isNaN(jsDate.getTime())) return jsDate.toISOString();
+    }
   }
-  const d = new Date(String(val));
+  const s = String(val).trim();
+  if (!s) return null;
+  const d = new Date(s);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
@@ -63,7 +67,7 @@ export async function importExcelFile(file: File): Promise<{
   proprietaryCount: number;
 }> {
   const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
   const batchId = generateBatchId();
 
   // Clear all existing data first to ensure latest upload overwrites everything
@@ -84,7 +88,7 @@ export async function importExcelFile(file: File): Promise<{
   let tradingCount = 0;
   let proprietaryCount = 0;
   if (sheet1) {
-    const data1 = XLSX.utils.sheet_to_json<unknown[]>(sheet1, { header: 1 });
+    const data1 = XLSX.utils.sheet_to_json<unknown[]>(sheet1, { header: 1, raw: true, defval: null });
     const rows1 = data1
       .slice(1)
       .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
@@ -125,7 +129,7 @@ export async function importExcelFile(file: File): Promise<{
 
   // Import 交易敞口台账
   if (sheet2) {
-    const data2 = XLSX.utils.sheet_to_json<unknown[]>(sheet2, { header: 1 });
+    const data2 = XLSX.utils.sheet_to_json<unknown[]>(sheet2, { header: 1, raw: true, defval: null });
     const rows2 = data2
       .slice(1)
       .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
@@ -173,7 +177,7 @@ export async function importExcelFile(file: File): Promise<{
 
   // Import 自营交易台账
   if (sheet3) {
-    const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1 });
+    const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1, raw: true, defval: null });
     const rows3 = data3
       .slice(1)
       .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
@@ -218,39 +222,106 @@ export async function importExcelFile(file: File): Promise<{
   return { batchId, reportCount, tradingCount, proprietaryCount };
 }
 
-export async function chartStats(input: { ledger: LedgerType }) {
-  const all = await getAll(input.ledger);
+// Helper: get the PnL for a single record based on ledger type
+function getRecordPnl(item: LedgerRecord, ledger: LedgerType): number {
+  if (ledger === "trading") {
+    return Number(item.realizedPnlCny || item.unrealizedPnlCny || 0);
+  } else if (ledger === "report") {
+    return Number(item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
+  } else {
+    return Number(item.totalPnlUsd || item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
+  }
+}
 
-  // By currency pair - sum realized PnL
-  const currencyMap = new Map<string, number>();
-  const counterpartyMap = new Map<string, number>();
+// Pie chart stats: group by a dimension, sum PnL, top 5 + others
+export async function pieStats(input: {
+  ledger: LedgerType;
+  groupBy: "currencyPair" | "counterparty";
+}) {
+  const all = await getAll(input.ledger);
+  const map = new Map<string, number>();
 
   for (const item of all) {
-    let pnl = 0;
-    if (input.ledger === "trading") {
-      pnl = Number(item.realizedPnlCny || item.unrealizedPnlCny || 0);
-    } else if (input.ledger === "report") {
-      pnl = Number(item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
-    } else {
-      pnl = Number(item.totalPnlUsd || item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
-    }
-
-    const cp = item.currencyPair || "(未指定)";
-    currencyMap.set(cp, (currencyMap.get(cp) || 0) + pnl);
-
-    const ct = item.counterparty || "(未指定)";
-    counterpartyMap.set(ct, (counterpartyMap.get(ct) || 0) + pnl);
+    const key = (item as any)[input.groupBy];
+    if (!key || String(key).trim() === "") continue; // skip empty values to avoid "未指定"
+    const pnl = getRecordPnl(item, input.ledger);
+    map.set(key, (map.get(key) || 0) + pnl);
   }
 
-  const byCurrencyPair = Array.from(currencyMap.entries())
+  const entries = Array.from(map.entries())
     .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
 
-  const byCounterparty = Array.from(counterpartyMap.entries())
-    .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
-    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  // Top 5 + others
+  const top5 = entries.slice(0, 5);
+  const rest = entries.slice(5);
+  if (rest.length > 0) {
+    const othersValue = rest.reduce((sum, e) => sum + e.value, 0);
+    top5.push({ name: "其他", value: Number(othersValue.toFixed(2)) });
+  }
 
-  return { byCurrencyPair, byCounterparty };
+  return top5;
+}
+
+// Bar chart stats: group by dimension, split profit/loss
+export async function barStats(input: {
+  ledger: LedgerType;
+  groupBy: "currencyPair" | "counterparty" | "tradeDate";
+}) {
+  const all = await getAll(input.ledger);
+  const profitMap = new Map<string, number>();
+  const lossMap = new Map<string, number>();
+
+  for (const item of all) {
+    const pnl = getRecordPnl(item, input.ledger);
+    let key: string;
+
+    if (input.groupBy === "tradeDate") {
+      if (item.tradeDate) {
+        const d = new Date(item.tradeDate);
+        const year = d.getFullYear();
+        if (year === 2025) {
+          key = "2025年";
+        } else {
+          key = `${year}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        }
+      } else {
+        continue; // skip records without tradeDate
+      }
+    } else {
+      const rawKey = (item as any)[input.groupBy];
+      if (!rawKey || String(rawKey).trim() === "") continue;
+      key = rawKey;
+    }
+
+    if (pnl >= 0) {
+      profitMap.set(key, (profitMap.get(key) || 0) + pnl);
+    } else {
+      lossMap.set(key, (lossMap.get(key) || 0) + pnl); // keep negative
+    }
+  }
+
+  // Merge all keys, sort by total absolute value desc
+  const allKeys = new Set([...profitMap.keys(), ...lossMap.keys()]);
+  const merged = Array.from(allKeys).map((key) => ({
+    key,
+    profit: Number((profitMap.get(key) || 0).toFixed(2)),
+    loss: Number((lossMap.get(key) || 0).toFixed(2)),
+    total: Number(((profitMap.get(key) || 0) + (lossMap.get(key) || 0)).toFixed(2)),
+  }));
+
+  // Sort by absolute total desc by default; for tradeDate, sort chronologically
+  if (input.groupBy === "tradeDate") {
+    const toSortKey = (key: string) => {
+      if (key === "2025年") return "2025-00";
+      return key;
+    };
+    merged.sort((a, b) => toSortKey(a.key).localeCompare(toSortKey(b.key)));
+  } else {
+    merged.sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+  }
+
+  return merged;
 }
 
 export async function ledgerList(input: {

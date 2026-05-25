@@ -81,11 +81,20 @@ export const trpc: any = {
           ...opts,
         }),
     },
-    chartStats: {
-      useQuery: (input: { ledger: string }, opts?: any) =>
+    pieStats: {
+      useQuery: (input: { ledger: string; groupBy: string }, opts?: any) =>
         useQuery({
-          queryKey: ["ledger", "chartStats", input],
-          queryFn: () => localApi.chartStats(input as any),
+          queryKey: ["ledger", "pieStats", input],
+          queryFn: () => localApi.pieStats(input as any),
+          staleTime: opts?.staleTime ?? 0,
+          retry: opts?.retry ?? 1,
+        }),
+    },
+    barStats: {
+      useQuery: (input: { ledger: string; groupBy: string }, opts?: any) =>
+        useQuery({
+          queryKey: ["ledger", "barStats", input],
+          queryFn: () => localApi.barStats(input as any),
           staleTime: opts?.staleTime ?? 0,
           retry: opts?.retry ?? 1,
         }),

@@ -1,18 +1,30 @@
-import { Outlet, Link, useLocation } from "react-router";
+import { Outlet, Link, useLocation, useNavigate } from "react-router";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   LayoutDashboard,
   Shield,
   TrendingUp,
-  Settings,
+  ChevronDown,
+  Menu,
+  BookOpen,
 } from "lucide-react";
+
+const LEDGERS = [
+  { value: "report", label: "报表敞口台账", color: "#c41e3a" },
+  { value: "trading", label: "交易敞口台账", color: "#b8860b" },
+  { value: "proprietary", label: "自营交易台账", color: "#2e8b57" },
+];
 
 export function MainLayout() {
   const location = useLocation();
-
-  const navItems = [
-    { path: "/", label: "首页", icon: LayoutDashboard },
-  ];
+  const navigate = useNavigate();
+  const isHome = location.pathname === "/";
 
   return (
     <div className="min-h-screen bg-gradient-forex">
@@ -36,42 +48,80 @@ export function MainLayout() {
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => (
-              <Link key={item.path} to={item.path}>
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
+            {/* Ledger Selector Dropdown - sits to the left of the menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
-                  variant={location.pathname === item.path ? "default" : "ghost"}
+                  variant="outline"
                   size="sm"
-                  className={`gap-2 ${
-                    location.pathname === item.path
-                      ? "bg-[#c41e3a] hover:bg-[#a01830] text-white"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  className="gap-1.5 border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                  <BookOpen className="h-4 w-4" />
+                  <span className="hidden sm:inline">台账</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white border-gray-200">
+                {LEDGERS.map((ledger) => (
+                  <DropdownMenuItem
+                    key={ledger.value}
+                    onClick={() => {
+                      if (!isHome) navigate("/");
+                      // Dispatch a custom event to switch ledger on Home page
+                      window.dispatchEvent(
+                        new CustomEvent("switch-ledger", { detail: ledger.value })
+                      );
+                    }}
+                    className="flex items-center gap-2 cursor-pointer focus:bg-gray-50"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: ledger.color }}
+                    />
+                    <span className="text-sm text-gray-700">{ledger.label}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Main Menu Dropdown - top right */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                  <Menu className="h-4 w-4" />
+                  <span className="hidden sm:inline">菜单</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40 bg-white border-gray-200">
+                <DropdownMenuItem
+                  onClick={() => navigate("/")}
+                  className={`flex items-center gap-2 cursor-pointer focus:bg-gray-50 ${
+                    isHome ? "bg-gray-50" : ""
                   }`}
                 >
-                  <item.icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            ))}
-            <Link to="/admin">
-              <Button
-                variant={location.pathname === "/admin" ? "default" : "ghost"}
-                size="sm"
-                className={`gap-2 ${
-                  location.pathname === "/admin"
-                    ? "bg-[#c41e3a] hover:bg-[#a01830] text-white"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                }`}
-              >
-                <Shield className="h-4 w-4" />
-                后台维护
-              </Button>
-            </Link>
-          </nav>
+                  <LayoutDashboard className="h-4 w-4 text-[#b8860b]" />
+                  <span className="text-sm text-gray-700">首页</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => navigate("/admin")}
+                  className={`flex items-center gap-2 cursor-pointer focus:bg-gray-50 ${
+                    location.pathname === "/admin" ? "bg-gray-50" : ""
+                  }`}
+                >
+                  <Shield className="h-4 w-4 text-[#c41e3a]" />
+                  <span className="text-sm text-gray-700">后台维护</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
-          {/* Right side - Forex badge */}
-          <div className="flex items-center gap-3">
+            {/* FX badge */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#c41e3a]/10 border border-[#c41e3a]/20">
               <TrendingUp className="h-4 w-4 text-[#c41e3a]" />
               <span className="text-sm font-medium text-[#c41e3a]">外汇台账</span>

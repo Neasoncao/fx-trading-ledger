@@ -1,9 +1,16 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/providers/trpc";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -25,6 +32,7 @@ import {
   Clock,
   Phone,
   User,
+  BarChart as BarChartIcon,
 } from "lucide-react";
 import {
   PieChart,
@@ -33,6 +41,11 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
 } from "recharts";
 
 const LEDGERS = [
@@ -43,17 +56,91 @@ const LEDGERS = [
 
 const COLORS = ["#c41e3a", "#b8860b", "#2e8b57", "#1e90ff", "#ff6b35", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b", "#6366f1"];
 
+const PIE_OPTIONS = [
+  { value: "currencyPair", label: "货币对" },
+  { value: "counterparty", label: "交易对手" },
+];
+
+const BAR_OPTIONS = [
+  { value: "currencyPair", label: "货币对" },
+  { value: "counterparty", label: "交易对手" },
+  { value: "tradeDate", label: "交易时间" },
+];
+
+const GROUP_BY_OPTIONS = [
+  { value: "entity", label: "交易主体" },
+  { value: "trader", label: "交易员" },
+  { value: "counterparty", label: "交易对手" },
+  { value: "expiryStatus", label: "是否到期" },
+  { value: "closeStatus", label: "是否平仓" },
+  { value: "direction", label: "交易方向" },
+  { value: "productType", label: "衍生品类型" },
+  { value: "currencyPair", label: "货币对" },
+  { value: "callPut", label: "看涨看跌" },
+];
+
+// Format helpers
+const formatNumber = (n: number) => {
+  if (n === 0) return "-";
+  if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(2) + "亿";
+  if (Math.abs(n) >= 1e4) return (n / 1e4).toFixed(2) + "万";
+  return n.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+};
+
+const formatCurrency = (n: number) => {
+  if (n === 0) return "-";
+  const prefix = n >= 0 ? "+" : "";
+  return prefix + formatNumber(n);
+};
+
+const formatInteger = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined || val === "") return "-";
+  const n = Number(val);
+  if (isNaN(n)) return "-";
+  return Math.round(n).toLocaleString("zh-CN");
+};
+
+const formatPrice4 = (val: string | number | null | undefined) => {
+  if (val === null || val === undefined || val === "") return "-";
+  const n = Number(val);
+  if (isNaN(n)) return "-";
+  return n.toFixed(4);
+};
+
 export default function Home() {
   const [activeLedger, setActiveLedger] = useState<(typeof LEDGERS)[number]>(LEDGERS[0]);
   const [page, setPage] = useState(1);
   const [positionTab, setPositionTab] = useState<"closed" | "open">("open");
+  const [groupBy, setGroupBy] = useState("entity");
+  const [pieGroupBy, setPieGroupBy] = useState<"currencyPair" | "counterparty">("currencyPair");
+  const [barGroupBy, setBarGroupBy] = useState<"currencyPair" | "counterparty" | "tradeDate">("currencyPair");
   const pageSize = 20;
+
+  // Listen for ledger switch events from MainLayout
+  useEffect(() => {
+    const handler = (e: CustomEvent) => {
+      const ledgerValue = e.detail;
+      const ledger = LEDGERS.find((l) => l.value === ledgerValue);
+      if (ledger) {
+        setActiveLedger(ledger);
+        setPage(1);
+        setPositionTab("open");
+      }
+    };
+    window.addEventListener("switch-ledger", handler as EventListener);
+    return () => window.removeEventListener("switch-ledger", handler as EventListener);
+  }, []);
 
   // Position tabs: open = 未平仓, closed = 已平仓
   const closeStatusFilter = positionTab === "open" ? "Open" : "Close";
 
   const { data: summary } = trpc.ledger.summary.useQuery({
     ledger: activeLedger.value,
+  });
+
+  const { data: stats } = trpc.ledger.statistics.useQuery({
+    ledger: activeLedger.value,
+    groupBy: groupBy as any,
   });
 
   const { data: listData } = trpc.ledger.list.useQuery({
@@ -63,62 +150,35 @@ export default function Home() {
     filters: { closeStatus: closeStatusFilter },
   });
 
-  const { data: chartData } = trpc.ledger.chartStats.useQuery({
+  const { data: pieData } = trpc.ledger.pieStats.useQuery({
     ledger: activeLedger.value,
+    groupBy: pieGroupBy,
+  });
+
+  const { data: barData } = trpc.ledger.barStats.useQuery({
+    ledger: activeLedger.value,
+    groupBy: barGroupBy,
   });
 
   const totalPages = listData ? Math.ceil(listData.total / pageSize) : 0;
-
-  const formatNumber = (n: number) => {
-    if (n === 0) return "-";
-    if (Math.abs(n) >= 1e8) return (n / 1e8).toFixed(2) + "亿";
-    if (Math.abs(n) >= 1e4) return (n / 1e4).toFixed(2) + "万";
-    return n.toLocaleString("zh-CN", { maximumFractionDigits: 2 });
-  };
-
-  const formatCurrency = (n: number) => {
-    if (n === 0) return "-";
-    const prefix = n >= 0 ? "+" : "";
-    return prefix + formatNumber(n);
-  };
-
-  // Prepare pie chart data - only show top 8 + others
-  const currencyPieData = useMemo(() => {
-    if (!chartData?.byCurrencyPair?.length) return [];
-    const data = [...chartData.byCurrencyPair];
-    const top8 = data.slice(0, 8);
-    const others = data.slice(8);
-    if (others.length > 0) {
-      const othersValue = others.reduce((sum, d) => sum + d.value, 0);
-      top8.push({ name: "其他", value: Number(othersValue.toFixed(2)) });
-    }
-    return top8;
-  }, [chartData]);
-
-  const counterpartyPieData = useMemo(() => {
-    if (!chartData?.byCounterparty?.length) return [];
-    const data = [...chartData.byCounterparty];
-    const top8 = data.slice(0, 8);
-    const others = data.slice(8);
-    if (others.length > 0) {
-      const othersValue = others.reduce((sum, d) => sum + d.value, 0);
-      top8.push({ name: "其他", value: Number(othersValue.toFixed(2)) });
-    }
-    return top8;
-  }, [chartData]);
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">外汇交易台账统计</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            实时查看名义本金、盈亏情况与分类统计分析
-          </p>
+        <div className="flex items-center gap-3">
+          <div
+            className="h-3 w-3 rounded-full"
+            style={{ backgroundColor: activeLedger.color }}
+          />
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{activeLedger.label}</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              实时查看名义本金、盈亏情况与分类统计分析
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Admin entry button */}
           <Link to="/admin">
             <Button
               variant="outline"
@@ -129,30 +189,6 @@ export default function Home() {
               后台维护
             </Button>
           </Link>
-          <div className="flex rounded-lg overflow-hidden border border-gray-200">
-            {LEDGERS.map((ledger) => (
-              <button
-                key={ledger.value}
-                onClick={() => {
-                  setActiveLedger(ledger);
-                  setPage(1);
-                  setPositionTab("open");
-                }}
-                className={`px-4 py-2 text-sm font-medium transition-all ${
-                  activeLedger.value === ledger.value
-                    ? "text-white"
-                    : "text-gray-500 hover:text-gray-700 bg-gray-50"
-                }`}
-                style={
-                  activeLedger.value === ledger.value
-                    ? { backgroundColor: ledger.color }
-                    : {}
-                }
-              >
-                {ledger.label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -227,75 +263,131 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Pie Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-gradient-card border-gray-200">
+      {/* Statistics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Group By Stats List */}
+        <Card className="lg:col-span-1 bg-gradient-card border-gray-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
-              按货币对盈亏分布
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-[#b8860b]" />
+                分类统计分析
+              </CardTitle>
+              <Select value={groupBy} onValueChange={setGroupBy}>
+                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-900 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {GROUP_BY_OPTIONS.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="h-[320px]">
-              {currencyPieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={currencyPieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) =>
-                        `${name}: ${(percent * 100).toFixed(0)}%`
-                      }
+            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
+              {stats?.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-[#b8860b]/30 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 truncate">
+                        {item.groupValue}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] border-gray-200 text-gray-500"
+                      >
+                        {item.count}笔
+                      </Badge>
+                    </div>
+                    <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.min(100, (item.totalNotional / (summary?.maxNotional || 1)) * 100)}%`,
+                          backgroundColor: activeLedger.color,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-gray-500">名义本金</p>
+                    <p className="text-sm font-semibold text-[#b8860b]">
+                      {formatNumber(item.totalNotional)}
+                    </p>
+                  </div>
+                  <div className="text-right flex-shrink-0 w-24">
+                    <p className="text-xs text-gray-500">
+                      {activeLedger.value === "proprietary" ? "合计盈亏" : "已实现盈亏"}
+                    </p>
+                    <p
+                      className={`text-sm font-semibold ${
+                        (activeLedger.value === "proprietary"
+                          ? item.totalPnl
+                          : item.totalRealizedPnl) >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
                     >
-                      {currencyPieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number, name: string) => [
-                        formatCurrency(value),
-                        name,
-                      ]}
-                      contentStyle={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  暂无数据
+                      {formatCurrency(
+                        activeLedger.value === "proprietary"
+                          ? item.totalPnl
+                          : item.totalRealizedPnl
+                      )}
+                    </p>
+                  </div>
                 </div>
-              )}
+              ))}
             </div>
           </CardContent>
         </Card>
 
+        {/* Pie Chart */}
         <Card className="bg-gradient-card border-gray-200">
           <CardHeader className="pb-3">
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
-              按交易对手盈亏分布
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+                <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
+                盈亏分布
+              </CardTitle>
+              <Select
+                value={pieGroupBy}
+                onValueChange={(v) => setPieGroupBy(v as any)}
+              >
+                <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-gray-200">
+                  {PIE_OPTIONS.map((opt) => (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+                    >
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-[320px]">
-              {counterpartyPieData.length > 0 ? (
+              {pieData && pieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={counterpartyPieData}
+                      data={pieData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
@@ -307,7 +399,7 @@ export default function Home() {
                         `${name}: ${(percent * 100).toFixed(0)}%`
                       }
                     >
-                      {counterpartyPieData.map((_, index) => (
+                      {pieData.map((_, index) => (
                         <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
@@ -336,7 +428,81 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Position Tabs + Data Table */}
+      {/* Bar Chart - Profit/Loss by Dimension */}
+      <Card className="bg-gradient-card border-gray-200">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+              <BarChartIcon className="h-5 w-5 text-[#b8860b]" />
+              盈亏柱状分析
+            </CardTitle>
+            <Select
+              value={barGroupBy}
+              onValueChange={(v) => setBarGroupBy(v as any)}
+            >
+              <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-gray-200">
+                {BAR_OPTIONS.map((opt) => (
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+                  >
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="h-[360px]">
+            {barData && barData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis 
+                    dataKey="key" 
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    angle={barGroupBy === "tradeDate" ? -45 : 0}
+                    textAnchor={barGroupBy === "tradeDate" ? "end" : "middle"}
+                    height={barGroupBy === "tradeDate" ? 60 : 30}
+                  />
+                  <YAxis 
+                    tick={{ fontSize: 11, fill: "#6b7280" }}
+                    tickFormatter={(v) => formatNumber(v)}
+                  />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrency(value),
+                      name === "profit" ? "盈利" : "亏损",
+                    ]}
+                    contentStyle={{
+                      background: "#fff",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                  />
+                  <Legend 
+                    formatter={(value: string) => value === "profit" ? "盈利" : "亏损"}
+                  />
+                  <Bar dataKey="profit" fill="#10b981" name="profit" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="loss" fill="#ef4444" name="loss" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                暂无数据
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Table */}
       <Card className="bg-gradient-card border-gray-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -381,19 +547,18 @@ export default function Home() {
             <Table>
               <TableHeader>
                 <TableRow className="border-gray-200 hover:bg-transparent">
-                  <TableHead className="text-gray-500 font-medium">序号</TableHead>
-                  <TableHead className="text-gray-500 font-medium">交易日期</TableHead>
-                  <TableHead className="text-gray-500 font-medium">交易主体</TableHead>
-                  <TableHead className="text-gray-500 font-medium">交易对手</TableHead>
-                  <TableHead className="text-gray-500 font-medium">状态</TableHead>
-                  <TableHead className="text-gray-500 font-medium">方向</TableHead>
-                  <TableHead className="text-gray-500 font-medium">类型</TableHead>
-                  <TableHead className="text-gray-500 font-medium">货币对</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-right">名义本金</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-right">开仓价格</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-right">权利金</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-right">未到期盈亏</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-right">已实现盈亏</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">序号</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">交易日期</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">交易对手</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">方向</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">类型</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">货币对</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">名义本金</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">开仓价格</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">权利金</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">未到期盈亏</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">已实现盈亏</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">到期日</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -410,41 +575,8 @@ export default function Home() {
                         ? new Date(item.tradeDate).toLocaleDateString("zh-CN")
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-gray-900 text-sm font-medium">
-                      {item.entity || "-"}
-                    </TableCell>
                     <TableCell className="text-gray-700 text-sm">
                       {item.counterparty || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        {item.expiryStatus && (
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] ${
-                              item.expiryStatus === "Active"
-                                ? "border-green-200 text-green-600 bg-green-50"
-                                : item.expiryStatus === "Expired"
-                                ? "border-gray-200 text-gray-400"
-                                : "border-yellow-200 text-yellow-600 bg-yellow-50"
-                            }`}
-                          >
-                            {item.expiryStatus}
-                          </Badge>
-                        )}
-                        {item.closeStatus && (
-                          <Badge
-                            variant="outline"
-                            className={`text-[10px] ${
-                              item.closeStatus === "Open"
-                                ? "border-[#c41e3a]/20 text-[#c41e3a]"
-                                : "border-gray-200 text-gray-400"
-                            }`}
-                          >
-                            {item.closeStatus}
-                          </Badge>
-                        )}
-                      </div>
                     </TableCell>
                     <TableCell>
                       <span
@@ -472,7 +604,7 @@ export default function Home() {
                         : "-"}
                     </TableCell>
                     <TableCell className="text-right text-gray-700 text-sm font-mono">
-                      {item.strikePrice || "-"}
+                      {formatPrice4(item.strikePrice)}
                     </TableCell>
                     <TableCell
                       className={`text-right text-sm font-mono ${
@@ -481,9 +613,7 @@ export default function Home() {
                           : "text-green-600"
                       }`}
                     >
-                      {item.premium
-                        ? Number(item.premium).toLocaleString("zh-CN")
-                        : "-"}
+                      {formatInteger(item.premium)}
                     </TableCell>
                     <TableCell
                       className={`text-right text-sm font-mono ${
@@ -494,15 +624,7 @@ export default function Home() {
                           : "text-gray-400"
                       }`}
                     >
-                      {item.unrealizedPnlUsd
-                        ? Number(item.unrealizedPnlUsd).toLocaleString("zh-CN", {
-                            maximumFractionDigits: 2,
-                          })
-                        : item.unrealizedPnlCny
-                        ? Number(item.unrealizedPnlCny).toLocaleString("zh-CN", {
-                            maximumFractionDigits: 2,
-                          })
-                        : "-"}
+                      {formatInteger(item.unrealizedPnlUsd ?? item.unrealizedPnlCny)}
                     </TableCell>
                     <TableCell
                       className={`text-right text-sm font-mono ${
@@ -517,18 +639,11 @@ export default function Home() {
                           : "text-gray-400"
                       }`}
                     >
-                      {item.realizedPnlUsd
-                        ? Number(item.realizedPnlUsd).toLocaleString("zh-CN", {
-                            maximumFractionDigits: 2,
-                          })
-                        : item.realizedPnlCny
-                        ? Number(item.realizedPnlCny).toLocaleString("zh-CN", {
-                            maximumFractionDigits: 2,
-                          })
-                        : item.totalPnlUsd
-                        ? Number(item.totalPnlUsd).toLocaleString("zh-CN", {
-                            maximumFractionDigits: 2,
-                          })
+                      {formatInteger(item.realizedPnlUsd ?? item.realizedPnlCny ?? item.totalPnlUsd)}
+                    </TableCell>
+                    <TableCell className="text-gray-700 text-sm whitespace-nowrap text-right">
+                      {item.deliveryDate
+                        ? new Date(item.deliveryDate).toLocaleDateString("zh-CN")
                         : "-"}
                     </TableCell>
                   </TableRow>
@@ -573,7 +688,6 @@ export default function Home() {
       <footer className="border-t border-gray-200 bg-white mt-8">
         <div className="max-w-[1600px] mx-auto px-6 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Company Info */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <img src="./logo-zijin.jpg" alt="紫金投资" className="h-8 w-auto" />
@@ -584,7 +698,6 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Contact */}
             <div>
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                 <User className="h-4 w-4 text-[#b8860b]" />
@@ -606,7 +719,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Copyright */}
             <div>
               <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                 <Shield className="h-4 w-4 text-[#b8860b]" />
