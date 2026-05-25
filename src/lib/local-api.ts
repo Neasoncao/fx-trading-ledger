@@ -10,7 +10,10 @@ import {
 
 function toDate(val: unknown): string | null {
   if (!val || val === "NaT" || val === "null" || val === "undefined") return null;
-  if (val instanceof Date) return val.toISOString();
+  if (val instanceof Date) {
+    if (val.getFullYear() < 1900) return null;
+    return val.toISOString();
+  }
   if (typeof val === "number") {
     // Excel date serial numbers are typically in range 1-100000 (1900-2200)
     // Financial figures like notionals/prices are usually >1M or <0.001, 
@@ -19,13 +22,15 @@ function toDate(val: unknown): string | null {
       // Excel epoch is 1899-12-30 (with 1900 leap year bug compatibility)
       const excelEpoch = new Date(Date.UTC(1899, 11, 30));
       const jsDate = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
-      if (!isNaN(jsDate.getTime())) return jsDate.toISOString();
+      if (!isNaN(jsDate.getTime()) && jsDate.getFullYear() >= 1900) return jsDate.toISOString();
     }
+    return null;
   }
   const s = String(val).trim();
   if (!s) return null;
   const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString();
+  if (isNaN(d.getTime()) || d.getFullYear() < 1900) return null;
+  return d.toISOString();
 }
 
 function isEmptyRow(row: unknown[]): boolean {
@@ -210,9 +215,9 @@ export async function importExcelFile(file: File): Promise<{
       unrealizedPnlLocal: toDecimal(row[25]),
       unrealizedPnlUsd: toDecimal(row[26]),
       futurePremium: toDecimal(row[27]),
-      totalPnlLocal: toDecimal(row[28]),
-      totalPnlUsd: toDecimal(row[29]),
-      realizedPnl2025: toDecimal(row[30]),
+      realizedPnlLocal: toDecimal(row[28]),
+      realizedPnlUsd: toDecimal(row[29]),
+      totalPnlUsd: toDecimal(row[30]),
       batchId,
     }));
     await addRecords("proprietary", records);
