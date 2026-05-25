@@ -154,6 +154,10 @@ export default function Home() {
     groupBy: barGroupBy,
   });
 
+  const { data: trendData } = trpc.ledger.trend.useQuery({
+    ledger: activeLedger.value,
+  });
+
   const totalPages = listData ? Math.ceil(listData.total / pageSize) : 0;
 
   return (
@@ -187,6 +191,117 @@ export default function Home() {
             </p>
           </div>
         </div>
+
+      {/* Trend Section */}
+      {trendData && (
+        <Card className="bg-gradient-card border-gray-200 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2 border-b border-gray-100">
+            <CardTitle className="text-gray-900 text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-[#c41e3a]" />
+              历史变化趋势
+              <span className="text-xs font-normal text-gray-400 ml-2">对比基准：日环比/周环比/月环比/年初至今</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+              {/* 交易笔数 */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-md bg-[#c41e3a]/10 flex items-center justify-center">
+                    <Table2 className="h-4 w-4 text-[#c41e3a]" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-800">交易笔数</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { label: "日环比", data: trendData.count.daily },
+                    { label: "周环比", data: trendData.count.weekly },
+                    { label: "月环比", data: trendData.count.monthly },
+                    { label: "年初至今", data: trendData.count.ytd },
+                  ]).map(({ label, data }) => (
+                    <div key={label} className="bg-gray-50/80 rounded-lg p-2.5">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+                      <p className="text-sm font-bold text-gray-900">{data.current.toLocaleString()}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={`text-xs font-medium ${data.change >= 0 ? "text-red-600" : "text-green-600"}`}>
+                          {data.change >= 0 ? "↑" : "↓"} {data.change > 0 ? "+" : ""}{data.change}
+                        </span>
+                        <span className={`text-[10px] ${data.changePct >= 0 ? "text-red-500" : "text-green-500"}`}>
+                          ({data.changePct >= 0 ? "+" : ""}{data.changePct.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 交易金额 */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-md bg-[#b8860b]/10 flex items-center justify-center">
+                    <DollarSign className="h-4 w-4 text-[#b8860b]" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-800">交易金额</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { label: "日环比", data: trendData.notional.daily },
+                    { label: "周环比", data: trendData.notional.weekly },
+                    { label: "月环比", data: trendData.notional.monthly },
+                    { label: "年初至今", data: trendData.notional.ytd },
+                  ]).map(({ label, data }) => (
+                    <div key={label} className="bg-gray-50/80 rounded-lg p-2.5">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+                      <p className="text-sm font-bold text-gray-900">{formatNumber(data.current)}</p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={`text-xs font-medium ${data.change >= 0 ? "text-red-600" : "text-green-600"}`}>
+                          {data.change >= 0 ? "↑" : "↓"} {data.change > 0 ? "+" : ""}{formatNumber(data.change)}
+                        </span>
+                        <span className={`text-[10px] ${data.changePct >= 0 ? "text-red-500" : "text-green-500"}`}>
+                          ({data.changePct >= 0 ? "+" : ""}{data.changePct.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 盈亏 */}
+              <div className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-7 w-7 rounded-md bg-purple-100 flex items-center justify-center">
+                    <BarChart3 className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-gray-800">盈亏</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { label: "日环比", data: trendData.pnl.daily },
+                    { label: "周环比", data: trendData.pnl.weekly },
+                    { label: "月环比", data: trendData.pnl.monthly },
+                    { label: "年初至今", data: trendData.pnl.ytd },
+                  ]).map(({ label, data }) => (
+                    <div key={label} className="bg-gray-50/80 rounded-lg p-2.5">
+                      <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{label}</p>
+                      <p className={`text-sm font-bold ${data.current >= 0 ? "text-red-600" : "text-green-600"}`}>
+                        {formatCurrency(data.current)}
+                      </p>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className={`text-xs font-medium ${data.change >= 0 ? "text-red-600" : "text-green-600"}`}>
+                          {data.change >= 0 ? "↑" : "↓"} {formatCurrency(data.change)}
+                        </span>
+                        <span className={`text-[10px] ${data.changePct >= 0 ? "text-red-500" : "text-green-500"}`}>
+                          ({data.changePct >= 0 ? "+" : ""}{data.changePct.toFixed(1)}%)
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

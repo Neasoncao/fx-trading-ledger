@@ -1,5 +1,5 @@
 const DB_NAME = "fx-ledger-db";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export type LedgerType = "report" | "trading" | "proprietary";
 
@@ -50,6 +50,19 @@ export interface LedgerRecord {
   createdAt?: string;
 }
 
+export interface Snapshot {
+  ledger: LedgerType;
+  date: string; // YYYY-MM-DD
+  totalCount: number;
+  openCount: number;
+  totalNotional: number;
+  openNotional: number;
+  realizedPnl: number;
+  unrealizedPnl: number;
+  totalPnl: number;
+  createdAt: string;
+}
+
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -63,6 +76,11 @@ function openDb(): Promise<IDBDatabase> {
         db.createObjectStore("trading", { keyPath: "id", autoIncrement: true });
       if (!db.objectStoreNames.contains("proprietary"))
         db.createObjectStore("proprietary", { keyPath: "id", autoIncrement: true });
+      if (!db.objectStoreNames.contains("snapshots")) {
+        const snapStore = db.createObjectStore("snapshots", { keyPath: "id", autoIncrement: true });
+        snapStore.createIndex("ledger_date", ["ledger", "date"], { unique: true });
+        snapStore.createIndex("ledger", "ledger", { unique: false });
+      }
     };
   });
 }
@@ -107,4 +125,84 @@ export async function clearLedger(ledger: LedgerType): Promise<void> {
 
 export async function clearAllLedgers(): Promise<void> {
   await Promise.all([clearLedger("report"), clearLedger("trading"), clearLedger("proprietary")]);
+}
+
+// ── Snapshot CRUD ──
+
+export async function saveSnapshot(snap: Snapshot): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("snapshots", "readwrite");
+    const store = tx.objectStore("snapshots");
+    const idx = store.index("ledger_date");
+    const getReq = idx.get([snap.ledger, snap.date]);
+    getReq.onsuccess = () => {
+      if (getReq.result) {
+        // update existing
+        const updated = { ...getReq.result, ...snap };
+        store.put(updated);
+      } else {
+        store.add(snap);
+      }
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Snapshot save failed"));
+  });
+}
+
+export async function getSnapshot(ledger: LedgerType, date: string): Promise<Snapshot | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("snapshots", "readonly");
+    const idx = tx.objectStore("snapshots").index("ledger_date");
+    const req = idx.get([ledger, date]);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getSnapshotsByLedger(ledger: LedgerType): Promise<Snapshot[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("snapshots", "readonly");
+    const idx = tx.objectStore("snapshots").index("ledger");
+    const req = idx.getAll(ledger);
+    req.onsuccess = () => {
+      const list: Snapshot[] = req.result || [];
+      list.sort((a, b) => a.date.localeCompare(b.date));
+      resolve(list);
+    };
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getLatestSnapshot(ledger: LedgerType): Promise<Snapshot | null> {
+  const all = await getSnapshotsByLedger(ledger);
+  return all.length > 0 ? all[all.length - 1] : null;
+}
+
+export async function deleteSnapshotBefore(ledger: LedgerType, beforeDate: string): Promise<void> {
+  const all = await getSnapshotsByLedger(ledger);
+  const toDelete = all.filter(s => s.date < beforeDate);
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("snapshots", "readwrite");
+    const store = tx.objectStore("snapshots");
+    for (const s of toDelete) {
+      if (s.id) store.delete(s.id);
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Snapshot delete failed"));
+  });
+}
+
+export async function clearAllSnapshots(): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction("snapshots", "readwrite");
+    const store = tx.objectStore("snapshots");
+    store.clear();
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Snapshot clear failed"));
+  });
 }

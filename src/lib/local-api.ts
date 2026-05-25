@@ -4,8 +4,13 @@ import {
   getAll,
   addRecords,
   clearAllLedgers,
+  saveSnapshot,
+  getSnapshot,
+  getSnapshotsByLedger,
+  getLatestSnapshot,
   type LedgerType,
   type LedgerRecord,
+  type Snapshot,
 } from "./db";
 
 function toDate(val: unknown): string | null {
@@ -222,6 +227,24 @@ export async function importExcelFile(file: File): Promise<{
     }));
     await addRecords("proprietary", records);
     proprietaryCount = records.length;
+  }
+
+  // Auto-save snapshots after import
+  const today = new Date().toISOString().split("T")[0];
+  for (const ledger of ["report", "trading", "proprietary"] as LedgerType[]) {
+    const summary = await ledgerSummary({ ledger });
+    await saveSnapshot({
+      ledger,
+      date: today,
+      totalCount: summary.totalCount,
+      openCount: summary.openCount,
+      totalNotional: summary.totalNotional,
+      openNotional: summary.openNotional,
+      realizedPnl: summary.realizedPnl,
+      unrealizedPnl: summary.unrealizedPnl,
+      totalPnl: summary.totalPnl,
+      createdAt: new Date().toISOString(),
+    });
   }
 
   return { batchId, reportCount, tradingCount, proprietaryCount };
@@ -493,3 +516,86 @@ export async function ledgerFilterOptions(input: { ledger: LedgerType }) {
 
 // Re-export clearAllLedgers for use by trpc provider
 export { clearAllLedgers } from "./db";
+
+// ── Trend / Historical Snapshot ──
+
+export interface TrendPeriod {
+  current: number;
+  previous: number;
+  change: number;
+  changePct: number;
+}
+
+export interface TrendMetric {
+  daily: TrendPeriod;
+  weekly: TrendPeriod;
+  monthly: TrendPeriod;
+  ytd: TrendPeriod;
+}
+
+export interface TrendData {
+  count: TrendMetric;      // 总交易笔数
+  notional: TrendMetric;   // 交易本金 (totalNotional)
+  pnl: TrendMetric;        // 总盈亏
+}
+
+function makeTrendPeriod(current: number, previous: number): TrendPeriod {
+  const change = current - previous;
+  const changePct = previous !== 0 ? (change / previous) * 100 : 0;
+  return { current, previous, change, changePct };
+}
+
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split("T")[0];
+}
+
+export async function getTrendData(ledger: LedgerType): Promise<TrendData | null> {
+  const snaps = await getSnapshotsByLedger(ledger);
+  if (snaps.length === 0) return null;
+
+  const latest = snaps[snaps.length - 1];
+  const latestDate = latest.date;
+  const yearStart = latestDate.slice(0, 4) + "-01-01";
+
+  // Find reference snapshots
+  const prevSnap = snaps.length >= 2 ? snaps[snaps.length - 2] : null;
+  const weekAgoDate = addDays(latestDate, -7);
+  const weekSnap = findNearestSnapBefore(snaps, weekAgoDate);
+  const monthAgoDate = addDays(latestDate, -30);
+  const monthSnap = findNearestSnapBefore(snaps, monthAgoDate);
+  const ytdSnap = snaps.find(s => s.date >= yearStart) || snaps[0];
+
+  return {
+    count: {
+      daily: makeTrendPeriod(latest.totalCount, prevSnap?.totalCount ?? 0),
+      weekly: makeTrendPeriod(latest.totalCount, weekSnap?.totalCount ?? 0),
+      monthly: makeTrendPeriod(latest.totalCount, monthSnap?.totalCount ?? 0),
+      ytd: makeTrendPeriod(latest.totalCount, ytdSnap.totalCount),
+    },
+    notional: {
+      daily: makeTrendPeriod(latest.totalNotional, prevSnap?.totalNotional ?? 0),
+      weekly: makeTrendPeriod(latest.totalNotional, weekSnap?.totalNotional ?? 0),
+      monthly: makeTrendPeriod(latest.totalNotional, monthSnap?.totalNotional ?? 0),
+      ytd: makeTrendPeriod(latest.totalNotional, ytdSnap.totalNotional),
+    },
+    pnl: {
+      daily: makeTrendPeriod(latest.totalPnl, prevSnap?.totalPnl ?? 0),
+      weekly: makeTrendPeriod(latest.totalPnl, weekSnap?.totalPnl ?? 0),
+      monthly: makeTrendPeriod(latest.totalPnl, monthSnap?.totalPnl ?? 0),
+      ytd: makeTrendPeriod(latest.totalPnl, ytdSnap.totalPnl),
+    },
+  };
+}
+
+function findNearestSnapBefore(snaps: Snapshot[], targetDate: string): Snapshot | null {
+  // Find the latest snap with date <= targetDate
+  for (let i = snaps.length - 1; i >= 0; i--) {
+    if (snaps[i].date <= targetDate) return snaps[i];
+  }
+  return null;
+}
+
+// Also export getSnapshotsByLedger for admin/debug
+export { getSnapshotsByLedger };

@@ -99,6 +99,15 @@ export const trpc: any = {
           retry: opts?.retry ?? 1,
         }),
     },
+    trend: {
+      useQuery: (input: { ledger: string }, opts?: any) =>
+        useQuery({
+          queryKey: ["ledger", "trend", input],
+          queryFn: () => localApi.getTrendData(input.ledger as any),
+          staleTime: opts?.staleTime ?? 0,
+          retry: opts?.retry ?? 1,
+        }),
+    },
   },
   upload: {
     importExcel: {
