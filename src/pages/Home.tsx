@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/providers/trpc";
+import { getSnapshot } from "@/lib/local-api";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,48 @@ export default function Home() {
     };
     window.addEventListener("switch-ledger", handler as EventListener);
     return () => window.removeEventListener("switch-ledger", handler as EventListener);
+  }, []);
+
+  // Daily snapshot: auto-save at 15:00 Beijing time, and catch-up on page load
+  const saveSnapshotMutation = trpc.ledger.saveDailySnapshot.useMutation();
+
+  useEffect(() => {
+    // 1. Catch-up: if today's snapshot is missing, save one immediately on page load
+    const today = new Date().toISOString().split("T")[0];
+    localApi.getSnapshot("proprietary", today).then((snap) => {
+      if (!snap) {
+        saveSnapshotMutation.mutate();
+      }
+    });
+
+    // 2. Schedule the next 15:00 snapshot (Beijing time = UTC+8)
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNext = () => {
+      const now = new Date();
+      // Beijing time 15:00 = UTC 07:00
+      const beijingOffset = 8 * 60 * 60 * 1000;
+      const utcMs = now.getTime();
+      const beijingMs = utcMs + beijingOffset;
+      const beijingDate = new Date(beijingMs);
+      beijingDate.setUTCHours(7, 0, 0, 0); // 15:00 Beijing = 07:00 UTC
+      // If 15:00 already passed today, move to tomorrow
+      if (beijingDate.getTime() <= utcMs) {
+        beijingDate.setUTCDate(beijingDate.getUTCDate() + 1);
+      }
+      const delay = beijingDate.getTime() - utcMs;
+
+      timeoutId = setTimeout(() => {
+        saveSnapshotMutation.mutate();
+        scheduleNext(); // schedule the next day
+      }, delay);
+    };
+
+    scheduleNext();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   // Position tabs: open = 未平仓, closed = 已平仓

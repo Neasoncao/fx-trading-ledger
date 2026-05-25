@@ -229,22 +229,48 @@ export async function importExcelFile(file: File): Promise<{
     proprietaryCount = records.length;
   }
 
-  // Auto-save snapshots after import
-  const today = new Date().toISOString().split("T")[0];
-  for (const ledger of ["report", "trading", "proprietary"] as LedgerType[]) {
-    const summary = await ledgerSummary({ ledger });
-    await saveSnapshot({
-      ledger,
-      date: today,
-      totalCount: summary.totalCount,
-      openCount: summary.openCount,
-      totalNotional: summary.totalNotional,
-      openNotional: summary.openNotional,
-      realizedPnl: summary.realizedPnl,
-      unrealizedPnl: summary.unrealizedPnl,
-      totalPnl: summary.totalPnl,
-      createdAt: new Date().toISOString(),
-    });
+  // Import 自营交易台账
+  if (sheet3) {
+    const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1, raw: true, defval: null });
+    const rows3 = data3
+      .slice(1)
+      .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
+    const records: Omit<LedgerRecord, "id">[] = rows3.map((row) => ({
+      seqNo: toInt(row[0]),
+      tradeDate: toDate(row[1]),
+      entity: toString(row[2]),
+      trader: toString(row[3]),
+      counterparty: toString(row[4]),
+      expiryStatus: toString(row[5]),
+      closeStatus: toString(row[6]),
+      priceCurrency: toString(row[7]),
+      settleCurrency: toString(row[8]),
+      pricingDate: toDate(row[9]),
+      premiumDate: toDate(row[10]),
+      deliveryDate: toDate(row[11]),
+      direction: toString(row[12]),
+      productType: toString(row[13]),
+      currencyPair: toString(row[14]),
+      subType: toString(row[15]),
+      callPut: toString(row[16]),
+      notionalLocal: toDecimal(row[17]),
+      notionalUsd: toDecimal(row[18]),
+      barrier1: toDecimal(row[19]),
+      barrier2: toDecimal(row[20]),
+      strikePrice: toDecimal(row[21]),
+      premium: toDecimal(row[22]),
+      closeDate: toDate(row[23]),
+      closePrice: toDecimal(row[24]),
+      unrealizedPnlLocal: toDecimal(row[25]),
+      unrealizedPnlUsd: toDecimal(row[26]),
+      futurePremium: toDecimal(row[27]),
+      realizedPnlLocal: toDecimal(row[28]),
+      realizedPnlUsd: toDecimal(row[29]),
+      totalPnlUsd: toDecimal(row[30]),
+      batchId,
+    }));
+    await addRecords("proprietary", records);
+    proprietaryCount = records.length;
   }
 
   return { batchId, reportCount, tradingCount, proprietaryCount };
@@ -599,3 +625,27 @@ function findNearestSnapBefore(snaps: Snapshot[], targetDate: string): Snapshot 
 
 // Also export getSnapshotsByLedger for admin/debug
 export { getSnapshotsByLedger };
+
+// Export getSnapshot for frontend daily-snapshot check
+export { getSnapshot } from "./db";
+
+// ── Daily Snapshot ──
+
+export async function saveDailySnapshot(): Promise<void> {
+  const today = new Date().toISOString().split("T")[0];
+  for (const ledger of ["report", "trading", "proprietary"] as LedgerType[]) {
+    const summary = await ledgerSummary({ ledger });
+    await saveSnapshot({
+      ledger,
+      date: today,
+      totalCount: summary.totalCount,
+      openCount: summary.openCount,
+      totalNotional: summary.totalNotional,
+      openNotional: summary.openNotional,
+      realizedPnl: summary.realizedPnl,
+      unrealizedPnl: summary.unrealizedPnl,
+      totalPnl: summary.totalPnl,
+      createdAt: new Date().toISOString(),
+    });
+  }
+}

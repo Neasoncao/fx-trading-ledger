@@ -108,6 +108,13 @@ export const trpc: any = {
           retry: opts?.retry ?? 1,
         }),
     },
+    saveDailySnapshot: {
+      useMutation: (opts?: any) =>
+        useMutation({
+          mutationFn: () => localApi.saveDailySnapshot(),
+          ...opts,
+        }),
+    },
   },
   upload: {
     importExcel: {
