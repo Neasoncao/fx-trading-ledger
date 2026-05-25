@@ -1,16 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/providers/trpc";
 import { Link } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -20,21 +13,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  PieChart as PieChartIcon,
   TrendingUp,
   DollarSign,
   BarChart3,
-  PieChart,
   Activity,
-  Filter,
   ChevronLeft,
   ChevronRight,
   Table2,
   Shield,
-  Globe,
   Clock,
   Phone,
   User,
 } from "lucide-react";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 const LEDGERS = [
   { value: "report" as const, label: "报表敞口台账", color: "#c41e3a" },
@@ -42,50 +41,30 @@ const LEDGERS = [
   { value: "proprietary" as const, label: "自营交易台账", color: "#2e8b57" },
 ];
 
-const GROUP_BY_OPTIONS = [
-  { value: "entity", label: "交易主体" },
-  { value: "trader", label: "交易员" },
-  { value: "counterparty", label: "交易对手" },
-  { value: "expiryStatus", label: "是否到期" },
-  { value: "closeStatus", label: "是否平仓" },
-  { value: "direction", label: "交易方向" },
-  { value: "productType", label: "衍生品类型" },
-  { value: "currencyPair", label: "货币对" },
-  { value: "callPut", label: "看涨看跌" },
-];
-
-const CURRENCY_PAIRS = [
-  { pair: "EUR/USD", rate: "1.0847", change: "+0.12%" },
-  { pair: "GBP/USD", rate: "1.2735", change: "-0.05%" },
-  { pair: "USD/JPY", rate: "156.82", change: "+0.34%" },
-  { pair: "USD/CNH", rate: "7.2456", change: "+0.08%" },
-  { pair: "AUD/USD", rate: "0.6654", change: "-0.21%" },
-];
+const COLORS = ["#c41e3a", "#b8860b", "#2e8b57", "#1e90ff", "#ff6b35", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b", "#6366f1"];
 
 export default function Home() {
   const [activeLedger, setActiveLedger] = useState<(typeof LEDGERS)[number]>(LEDGERS[0]);
-  const [groupBy, setGroupBy] = useState("entity");
   const [page, setPage] = useState(1);
-  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [positionTab, setPositionTab] = useState<"closed" | "open">("open");
   const pageSize = 20;
+
+  // Boss says: close = 未平仓, open = 已平仓
+  // So for the "已平仓" tab we show open status, for "未平仓" we show close status
+  const closeStatusFilter = positionTab === "closed" ? "Close" : "Open";
 
   const { data: summary } = trpc.ledger.summary.useQuery({
     ledger: activeLedger.value,
-  });
-
-  const { data: stats } = trpc.ledger.statistics.useQuery({
-    ledger: activeLedger.value,
-    groupBy: groupBy as any,
   });
 
   const { data: listData } = trpc.ledger.list.useQuery({
     ledger: activeLedger.value,
     page,
     pageSize,
-    filters: Object.keys(filters).length > 0 ? filters : undefined,
+    filters: { closeStatus: closeStatusFilter },
   });
 
-  const { data: filterOptions } = trpc.ledger.filterOptions.useQuery({
+  const { data: chartData } = trpc.ledger.chartStats.useQuery({
     ledger: activeLedger.value,
   });
 
@@ -103,6 +82,31 @@ export default function Home() {
     const prefix = n >= 0 ? "+" : "";
     return prefix + formatNumber(n);
   };
+
+  // Prepare pie chart data - only show top 8 + others
+  const currencyPieData = useMemo(() => {
+    if (!chartData?.byCurrencyPair?.length) return [];
+    const data = [...chartData.byCurrencyPair];
+    const top8 = data.slice(0, 8);
+    const others = data.slice(8);
+    if (others.length > 0) {
+      const othersValue = others.reduce((sum, d) => sum + d.value, 0);
+      top8.push({ name: "其他", value: Number(othersValue.toFixed(2)) });
+    }
+    return top8;
+  }, [chartData]);
+
+  const counterpartyPieData = useMemo(() => {
+    if (!chartData?.byCounterparty?.length) return [];
+    const data = [...chartData.byCounterparty];
+    const top8 = data.slice(0, 8);
+    const others = data.slice(8);
+    if (others.length > 0) {
+      const othersValue = others.reduce((sum, d) => sum + d.value, 0);
+      top8.push({ name: "其他", value: Number(othersValue.toFixed(2)) });
+    }
+    return top8;
+  }, [chartData]);
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
@@ -133,7 +137,7 @@ export default function Home() {
                 onClick={() => {
                   setActiveLedger(ledger);
                   setPage(1);
-                  setFilters({});
+                  setPositionTab("open");
                 }}
                 className={`px-4 py-2 text-sm font-medium transition-all ${
                   activeLedger.value === ledger.value
@@ -152,41 +156,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Forex Market Ticker */}
-      <Card className="bg-gradient-card border-gray-200">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-gray-900 text-base flex items-center gap-2">
-            <Globe className="h-5 w-5 text-[#b8860b]" />
-            外汇市场实时行情
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {CURRENCY_PAIRS.map((item) => (
-              <div
-                key={item.pair}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-50 border border-gray-100"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">{item.pair}</p>
-                  <p className="text-xs text-gray-500">{item.rate}</p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] ${
-                    item.change.startsWith("+")
-                      ? "border-green-200 text-green-600 bg-green-50"
-                      : "border-red-200 text-red-600 bg-red-50"
-                  }`}
-                >
-                  {item.change}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -259,271 +228,119 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Statistics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Group By Stats */}
-        <Card className="lg:col-span-2 bg-gradient-card border-gray-200">
+      {/* Pie Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="bg-gradient-card border-gray-200">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-                <PieChart className="h-5 w-5 text-[#b8860b]" />
-                分类统计分析
-              </CardTitle>
-              <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger className="w-[160px] bg-white border-gray-200 text-gray-900">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200">
-                  {GROUP_BY_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      value={opt.value}
-                      className="text-gray-700 focus:bg-gray-100 focus:text-gray-900"
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
+              按货币对盈亏分布
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {stats?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-[#b8860b]/30 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 truncate">
-                        {item.groupValue}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-gray-200 text-gray-500"
-                      >
-                        {item.count}笔
-                      </Badge>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(100, (item.totalNotional / (summary?.maxNotional || 1)) * 100)}%`,
-                          backgroundColor: activeLedger.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-gray-500">名义本金</p>
-                    <p className="text-sm font-semibold text-[#b8860b]">
-                      {formatNumber(item.totalNotional)}
-                    </p>
-                  </div>
-                  <div className="text-right flex-shrink-0 w-24">
-                    <p className="text-xs text-gray-500">
-                      {activeLedger.value === "proprietary" ? "合计盈亏" : "已实现盈亏"}
-                    </p>
-                    <p
-                      className={`text-sm font-semibold ${
-                        (activeLedger.value === "proprietary"
-                          ? item.totalPnl
-                          : item.totalRealizedPnl) >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
+            <div className="h-[320px]">
+              {currencyPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={currencyPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
+                      }
                     >
-                      {formatCurrency(
-                        activeLedger.value === "proprietary"
-                          ? item.totalPnl
-                          : item.totalRealizedPnl
-                      )}
-                    </p>
-                  </div>
+                      {currencyPieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        formatCurrency(value),
+                        name,
+                      ]}
+                      contentStyle={{
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  暂无数据
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Filter Panel */}
         <Card className="bg-gradient-card border-gray-200">
           <CardHeader className="pb-3">
             <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <Filter className="h-5 w-5 text-[#b8860b]" />
-              筛选条件
+              <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
+              按交易对手盈亏分布
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {filterOptions && (
-              <>
-                {filterOptions.entities.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">交易主体</label>
-                    <Select
-                      value={filters.entity || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, entity: v === "all" ? "" : v }))
+          <CardContent>
+            <div className="h-[320px]">
+              {counterpartyPieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={counterpartyPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, percent }) =>
+                        `${name}: ${(percent * 100).toFixed(0)}%`
                       }
                     >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.entities.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {filterOptions.counterparties.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">交易对手</label>
-                    <Select
-                      value={filters.counterparty || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, counterparty: v === "all" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.counterparties.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {filterOptions.productTypes.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">衍生品类型</label>
-                    <Select
-                      value={filters.productType || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, productType: v === "all" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.productTypes.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {filterOptions.currencyPairs.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">货币对</label>
-                    <Select
-                      value={filters.currencyPair || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, currencyPair: v === "all" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.currencyPairs.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {filterOptions.expiryStatuses.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">到期状态</label>
-                    <Select
-                      value={filters.expiryStatus || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, expiryStatus: v === "all" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.expiryStatuses.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {filterOptions.closeStatuses.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-500 mb-1.5 block">平仓状态</label>
-                    <Select
-                      value={filters.closeStatus || "all"}
-                      onValueChange={(v) =>
-                        setFilters((f) => ({ ...f, closeStatus: v === "all" ? "" : v }))
-                      }
-                    >
-                      <SelectTrigger className="bg-white border-gray-200 text-gray-700">
-                        <SelectValue placeholder="全部" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-white border-gray-200">
-                        <SelectItem value="all" className="text-gray-700">全部</SelectItem>
-                        {filterOptions.closeStatuses.filter(Boolean).map((e) => (
-                          <SelectItem key={e!} value={e!} className="text-gray-700">
-                            {e}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
-            )}
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setFilters({});
-                setPage(1);
-              }}
-              className="w-full border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
-            >
-              清除筛选
-            </Button>
+                      {counterpartyPieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: number, name: string) => [
+                        formatCurrency(value),
+                        name,
+                      ]}
+                      contentStyle={{
+                        background: "#fff",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "12px",
+                      }}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  暂无数据
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Data Table */}
+      {/* Position Tabs + Data Table */}
       <Card className="bg-gradient-card border-gray-200">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
               <Table2 className="h-5 w-5 text-[#b8860b]" />
               交易明细
@@ -534,28 +351,29 @@ export default function Home() {
                 {listData?.total ?? 0} 条
               </Badge>
             </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => p - 1)}
-                className="border-gray-200 text-gray-500 hover:text-gray-700"
+
+            {/* Position Tabs - Boss says: close = 未平仓, open = 已平仓 */}
+            <div className="flex rounded-lg overflow-hidden border border-gray-200">
+              <button
+                onClick={() => { setPositionTab("open"); setPage(1); }}
+                className={`px-4 py-2 text-sm font-medium transition-all ${
+                  positionTab === "open"
+                    ? "bg-[#2e8b57] text-white"
+                    : "bg-gray-50 text-gray-500 hover:text-gray-700"
+                }`}
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-gray-500">
-                {page} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => p + 1)}
-                className="border-gray-200 text-gray-500 hover:text-gray-700"
+                已平仓 (Open)
+              </button>
+              <button
+                onClick={() => { setPositionTab("closed"); setPage(1); }}
+                className={`px-4 py-2 text-sm font-medium transition-all ${
+                  positionTab === "closed"
+                    ? "bg-[#c41e3a] text-white"
+                    : "bg-gray-50 text-gray-500 hover:text-gray-700"
+                }`}
               >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+                未平仓 (Close)
+              </button>
             </div>
           </div>
         </CardHeader>
@@ -759,7 +577,7 @@ export default function Home() {
             {/* Company Info */}
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <img src="/logo-zijin.jpg" alt="紫金投资" className="h-8 w-auto" />
+                <img src="./logo-zijin.jpg" alt="紫金投资" className="h-8 w-auto" />
                 <span className="font-bold text-gray-900">紫金投资</span>
               </div>
               <p className="text-sm text-gray-500">

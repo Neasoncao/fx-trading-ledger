@@ -81,6 +81,15 @@ export const trpc: any = {
           ...opts,
         }),
     },
+    chartStats: {
+      useQuery: (input: { ledger: string }, opts?: any) =>
+        useQuery({
+          queryKey: ["ledger", "chartStats", input],
+          queryFn: () => localApi.chartStats(input as any),
+          staleTime: opts?.staleTime ?? 0,
+          retry: opts?.retry ?? 1,
+        }),
+    },
   },
   upload: {
     importExcel: {

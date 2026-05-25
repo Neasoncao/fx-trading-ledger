@@ -11,8 +11,28 @@ import {
 function toDate(val: unknown): string | null {
   if (!val || val === "NaT") return null;
   if (val instanceof Date) return val.toISOString();
+  // Handle Excel date serial numbers
+  if (typeof val === "number") {
+    // Excel epoch is 1899-12-30, but JS epoch is 1970-01-01
+    // Excel serial 1 = 1899-12-31, 25569 = 1970-01-01
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    const daysSinceEpoch = val;
+    const jsDate = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
+    if (!isNaN(jsDate.getTime())) return jsDate.toISOString();
+  }
   const d = new Date(String(val));
   return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+function isEmptyRow(row: unknown[]): boolean {
+  // Skip if only seqNo exists and everything else is empty
+  if (row.length <= 1) return true;
+  const hasData = row.slice(1).some((cell) => {
+    if (cell === null || cell === undefined || cell === "" || cell === "NaT") return false;
+    if (typeof cell === "string" && cell.trim() === "") return false;
+    return true;
+  });
+  return !hasData;
 }
 
 function toDecimal(val: unknown): string | null {
@@ -67,7 +87,7 @@ export async function importExcelFile(file: File): Promise<{
     const data1 = XLSX.utils.sheet_to_json<unknown[]>(sheet1, { header: 1 });
     const rows1 = data1
       .slice(1)
-      .filter((row) => row[0] !== undefined && row[0] !== "");
+      .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
     const records: Omit<LedgerRecord, "id">[] = rows1.map((row) => ({
       seqNo: toInt(row[0]),
       tradeDate: toDate(row[1]),
@@ -108,7 +128,7 @@ export async function importExcelFile(file: File): Promise<{
     const data2 = XLSX.utils.sheet_to_json<unknown[]>(sheet2, { header: 1 });
     const rows2 = data2
       .slice(1)
-      .filter((row) => row[0] !== undefined && row[0] !== "");
+      .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
     const records: Omit<LedgerRecord, "id">[] = rows2.map((row) => ({
       seqNo: toInt(row[0]),
       tradeDate: toDate(row[1]),
@@ -156,7 +176,7 @@ export async function importExcelFile(file: File): Promise<{
     const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1 });
     const rows3 = data3
       .slice(1)
-      .filter((row) => row[0] !== undefined && row[0] !== "");
+      .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
     const records: Omit<LedgerRecord, "id">[] = rows3.map((row) => ({
       seqNo: toInt(row[0]),
       tradeDate: toDate(row[1]),
@@ -198,6 +218,41 @@ export async function importExcelFile(file: File): Promise<{
   return { batchId, reportCount, tradingCount, proprietaryCount };
 }
 
+export async function chartStats(input: { ledger: LedgerType }) {
+  const all = await getAll(input.ledger);
+
+  // By currency pair - sum realized PnL
+  const currencyMap = new Map<string, number>();
+  const counterpartyMap = new Map<string, number>();
+
+  for (const item of all) {
+    let pnl = 0;
+    if (input.ledger === "trading") {
+      pnl = Number(item.realizedPnlCny || item.unrealizedPnlCny || 0);
+    } else if (input.ledger === "report") {
+      pnl = Number(item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
+    } else {
+      pnl = Number(item.totalPnlUsd || item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
+    }
+
+    const cp = item.currencyPair || "(未指定)";
+    currencyMap.set(cp, (currencyMap.get(cp) || 0) + pnl);
+
+    const ct = item.counterparty || "(未指定)";
+    counterpartyMap.set(ct, (counterpartyMap.get(ct) || 0) + pnl);
+  }
+
+  const byCurrencyPair = Array.from(currencyMap.entries())
+    .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+
+  const byCounterparty = Array.from(counterpartyMap.entries())
+    .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+
+  return { byCurrencyPair, byCounterparty };
+}
+
 export async function ledgerList(input: {
   ledger: LedgerType;
   page: number;
@@ -221,8 +276,13 @@ export async function ledgerList(input: {
   const total = filtered.length;
   const offset = (input.page - 1) * input.pageSize;
 
-  // Sort by id desc, then paginate
-  const sorted = [...filtered].sort((a, b) => (b.id || 0) - (a.id || 0));
+  // Sort by tradeDate desc (newest first), then by id desc, then paginate
+  const sorted = [...filtered].sort((a, b) => {
+    const dateA = a.tradeDate ? new Date(a.tradeDate).getTime() : 0;
+    const dateB = b.tradeDate ? new Date(b.tradeDate).getTime() : 0;
+    if (dateB !== dateA) return dateB - dateA;
+    return (b.id || 0) - (a.id || 0);
+  });
   const items = sorted.slice(offset, offset + input.pageSize);
 
   return { items, total, page: input.page, pageSize: input.pageSize };

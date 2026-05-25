@@ -22,7 +22,7 @@ export function MainLayout() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <img 
-              src="/logo-zijin.jpg" 
+              src="./logo-zijin.jpg" 
               alt="紫金投资" 
               className="h-9 w-auto object-contain"
             />
