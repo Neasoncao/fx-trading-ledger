@@ -280,14 +280,13 @@ export async function pieStats(input: {
   return top5;
 }
 
-// Bar chart stats: group by dimension, split profit/loss
+// Bar chart stats: group by dimension, sum total PnL (one bar per group)
 export async function barStats(input: {
   ledger: LedgerType;
   groupBy: "currencyPair" | "counterparty" | "tradeDate";
 }) {
   const all = await getAll(input.ledger);
-  const profitMap = new Map<string, number>();
-  const lossMap = new Map<string, number>();
+  const map = new Map<string, number>();
 
   for (const item of all) {
     const pnl = getRecordPnl(item);
@@ -303,7 +302,7 @@ export async function barStats(input: {
           key = `${year}-${String(d.getMonth() + 1).padStart(2, "0")}`;
         }
       } else {
-        continue; // skip records without tradeDate
+        continue;
       }
     } else {
       const rawKey = (item as any)[input.groupBy];
@@ -311,34 +310,26 @@ export async function barStats(input: {
       key = rawKey;
     }
 
-    if (pnl >= 0) {
-      profitMap.set(key, (profitMap.get(key) || 0) + pnl);
-    } else {
-      lossMap.set(key, (lossMap.get(key) || 0) + pnl); // keep negative
-    }
+    map.set(key, (map.get(key) || 0) + pnl);
   }
 
-  // Merge all keys, sort by total absolute value desc
-  const allKeys = new Set([...profitMap.keys(), ...lossMap.keys()]);
-  const merged = Array.from(allKeys).map((key) => ({
+  const entries = Array.from(map.entries()).map(([key, value]) => ({
     key,
-    profit: Number((profitMap.get(key) || 0).toFixed(2)),
-    loss: Number((lossMap.get(key) || 0).toFixed(2)),
-    total: Number(((profitMap.get(key) || 0) + (lossMap.get(key) || 0)).toFixed(2)),
+    value: Number(value.toFixed(2)),
   }));
 
-  // Sort by absolute total desc by default; for tradeDate, sort chronologically
+  // Sort by absolute value desc by default; for tradeDate sort chronologically
   if (input.groupBy === "tradeDate") {
     const toSortKey = (key: string) => {
       if (key === "2025年") return "2025-00";
       return key;
     };
-    merged.sort((a, b) => toSortKey(a.key).localeCompare(toSortKey(b.key)));
+    entries.sort((a, b) => toSortKey(a.key).localeCompare(toSortKey(b.key)));
   } else {
-    merged.sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+    entries.sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
   }
 
-  return merged;
+  return entries;
 }
 
 export async function ledgerList(input: {

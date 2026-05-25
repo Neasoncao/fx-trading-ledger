@@ -173,120 +173,102 @@ export default function Home() {
         </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* 交易笔数 */}
         <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-500 uppercase tracking-wider">交易笔数</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">存续交易笔数</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {summary?.openCount?.toLocaleString() ?? "-"}
-                </p>
+                <p className="text-xs text-gray-400">存续交易笔数</p>
+                <p className="text-xl font-bold text-gray-900">{summary?.openCount?.toLocaleString() ?? "-"}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-[#c41e3a]/10 flex items-center justify-center">
-                <Activity className="h-5 w-5 text-[#c41e3a]" />
+              <div className="h-8 w-8 rounded-lg bg-[#c41e3a]/10 flex items-center justify-center">
+                <Activity className="h-4 w-4 text-[#c41e3a]" />
+              </div>
+            </div>
+            <div className="border-t border-gray-100" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400">总交易笔数</p>
+                <p className="text-xl font-bold text-gray-900">{summary?.totalCount?.toLocaleString() ?? "-"}</p>
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                <Table2 className="h-4 w-4 text-gray-600" />
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* 交易金额 */}
         <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-500 uppercase tracking-wider">交易金额</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">总交易笔数</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {summary?.totalCount?.toLocaleString() ?? "-"}
-                </p>
+                <p className="text-xs text-gray-400">持仓本金</p>
+                <p className="text-xl font-bold text-[#b8860b]">{formatNumber(summary?.openNotional ?? 0)}</p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
-                <Table2 className="h-5 w-5 text-gray-600" />
+              <div className="h-8 w-8 rounded-lg bg-[#b8860b]/10 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-[#b8860b]" />
+              </div>
+            </div>
+            <div className="border-t border-gray-100" />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400">交易本金</p>
+                <p className="text-xl font-bold text-[#b8860b]">{formatNumber(summary?.totalNotional ?? 0)}</p>
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-[#b8860b]/10 flex items-center justify-center">
+                <DollarSign className="h-4 w-4 text-[#b8860b]" />
               </div>
             </div>
           </CardContent>
         </Card>
 
+        {/* 盈亏 */}
         <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-gray-500 uppercase tracking-wider">盈亏</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 pt-0">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">持仓本金</p>
-                <p className="text-2xl font-bold text-[#b8860b] mt-1">
-                  {formatNumber(summary?.openNotional ?? 0)}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-lg bg-[#b8860b]/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-[#b8860b]" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">交易本金</p>
-                <p className="text-2xl font-bold text-[#b8860b] mt-1">
-                  {formatNumber(summary?.totalNotional ?? 0)}
-                </p>
-              </div>
-              <div className="h-10 w-10 rounded-lg bg-[#b8860b]/10 flex items-center justify-center">
-                <DollarSign className="h-5 w-5 text-[#b8860b]" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">已确认盈亏</p>
-                <p className={`text-2xl font-bold mt-1 ${
-                  (summary?.realizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-                }`}>
+                <p className="text-xs text-gray-400">已确认盈亏</p>
+                <p className={`text-xl font-bold ${(summary?.realizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(summary?.realizedPnl ?? 0)}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+              <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                <BarChart3 className="h-4 w-4 text-blue-600" />
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
+            <div className="border-t border-gray-100" />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">持仓盈亏</p>
-                <p className={`text-2xl font-bold mt-1 ${
-                  (summary?.unrealizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-                }`}>
+                <p className="text-xs text-gray-400">持仓盈亏</p>
+                <p className={`text-xl font-bold ${(summary?.unrealizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(summary?.unrealizedPnl ?? 0)}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-green-600" />
+              <div className="h-8 w-8 rounded-lg bg-green-100 flex items-center justify-center">
+                <TrendingUp className="h-4 w-4 text-green-600" />
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-card border-gray-200 shadow-sm">
-          <CardContent className="p-4">
+            <div className="border-t border-gray-100" />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">总盈亏</p>
-                <p className={`text-2xl font-bold mt-1 ${
-                  (summary?.totalPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
-                }`}>
+                <p className="text-xs text-gray-400">总盈亏</p>
+                <p className={`text-xl font-bold ${(summary?.totalPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(summary?.totalPnl ?? 0)}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-purple-600" />
+              <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                <BarChart3 className="h-4 w-4 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -417,9 +399,9 @@ export default function Home() {
                     tickFormatter={(v) => formatNumber(v)}
                   />
                   <Tooltip
-                    formatter={(value: number, name: string) => [
+                    formatter={(value: number) => [
                       formatCurrency(value),
-                      name === "profit" ? "盈利" : "亏损",
+                      "合计盈亏",
                     ]}
                     contentStyle={{
                       background: "#fff",
@@ -428,11 +410,14 @@ export default function Home() {
                       fontSize: "12px",
                     }}
                   />
-                  <Legend 
-                    formatter={(value: string) => value === "profit" ? "盈利" : "亏损"}
-                  />
-                  <Bar dataKey="profit" fill="#10b981" name="profit" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="loss" fill="#ef4444" name="loss" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="value" name="合计盈亏" radius={[4, 4, 0, 0]}>
+                    {barData.map((entry: any, index: number) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={entry.value >= 0 ? "#c41e3a" : "#2e8b57"}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
