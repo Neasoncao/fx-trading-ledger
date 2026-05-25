@@ -1,73 +1,66 @@
-# React + TypeScript + Vite
+# FX Trading Ledger
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+外汇交易台账管理系统 —— 一个基于 React + TypeScript + Vite 的全栈 Web 应用。
 
-Currently, two official plugins are available:
+## 技术栈
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **前端**: React 19 + TypeScript + Vite + Tailwind CSS + shadcn/ui
+- **后端**: Hono + tRPC + Node.js
+- **数据库**: MySQL + Drizzle ORM
+- **构建**: GitHub Actions → GitHub Pages
 
-## React Compiler
+## 在线预览
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+🔗 **GitHub Pages**: https://neasoncao.github.io/fx-trading-ledger/
 
-## Expanding the ESLint configuration
+## 本地开发
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# 安装依赖
+npm install
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# 启动开发服务器
+npm run dev
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+# 构建生产版本
+npm run build
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 运行测试
+npm run test
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 数据库操作
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# 生成迁移文件
+npm run db:generate
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# 执行迁移
+npm run db:migrate
+
+# 推送 schema 变更
+npm run db:push
 ```
+
+## 项目结构
+
+```
+├── src/              # 前端源码
+│   ├── sections/     # 页面区块
+│   ├── hooks/        # 自定义 Hooks
+│   ├── types/        # 类型定义
+│   ├── components/   # UI 组件
+│   └── ...
+├── api/              # 后端 API
+├── contracts/        # 共享类型/接口
+├── db/               # 数据库 schema 和迁移
+└── .github/          # GitHub Actions 工作流
+```
+
+## 自动部署
+
+本项目配置了 GitHub Actions，每次推送到 `main` 分支时自动构建并部署到 GitHub Pages。
+
+---
+
+_由 OpenClaw Agent 负责维护_
