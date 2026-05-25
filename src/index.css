@@ -6,33 +6,33 @@
 
 @layer base {
   :root {
-    --background: 0 0% 7%;
-    --foreground: 45 30% 95%;
-    --card: 0 0% 10%;
-    --card-foreground: 45 30% 95%;
-    --popover: 0 0% 10%;
-    --popover-foreground: 45 30% 95%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
     --primary: 0 72% 45%;
-    --primary-foreground: 45 90% 96%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 45 60% 35%;
     --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 15%;
-    --muted-foreground: 45 10% 60%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
     --accent: 45 80% 50%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 20%;
-    --input: 0 0% 15%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
     --ring: 0 72% 45%;
     --radius: 0.5rem;
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 45 20% 85%;
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 20%;
     --sidebar-primary: 0 72% 45%;
-    --sidebar-primary-foreground: 45 90% 96%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 45 20% 85%;
-    --sidebar-border: 0 0% 18%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 96%;
+    --sidebar-accent-foreground: 0 0% 20%;
+    --sidebar-border: 0 0% 90%;
     --sidebar-ring: 0 72% 45%;
   }
 }
@@ -49,13 +49,13 @@
 
 @layer utilities {
   .text-gold {
-    color: #d4a843;
+    color: #b8860b;
   }
   .text-gold-light {
-    color: #f0d78c;
+    color: #d4a843;
   }
   .bg-gold {
-    background-color: #d4a843;
+    background-color: #b8860b;
   }
   .bg-gold-dark {
     background-color: #8b6914;
@@ -70,16 +70,16 @@
     background-color: #c41e3a;
   }
   .bg-gradient-forex {
-    background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #0d0d0d 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 50%, #ffffff 100%);
   }
   .bg-gradient-card {
-    background: linear-gradient(145deg, #111111 0%, #1a1a1a 100%);
+    background: linear-gradient(145deg, #ffffff 0%, #fafafa 100%);
   }
   .shadow-gold {
-    box-shadow: 0 0 15px rgba(212, 168, 67, 0.15);
+    box-shadow: 0 0 15px rgba(184, 134, 11, 0.15);
   }
   .shadow-gold-lg {
-    box-shadow: 0 0 30px rgba(212, 168, 67, 0.2);
+    box-shadow: 0 0 30px rgba(184, 134, 11, 0.2);
   }
 }
 
@@ -89,12 +89,12 @@
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #f0f0f0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d4a843;
+  background: #b8860b;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #f0d78c;
+  background: #d4a843;
 }

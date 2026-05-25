@@ -68,6 +68,19 @@ export const trpc: any = {
           retry: opts?.retry ?? 1,
         }),
     },
+    import: {
+      useMutation: (opts?: any) =>
+        useMutation({
+          mutationFn: ({
+            fileBase64,
+            filename,
+          }: {
+            fileBase64: string;
+            filename: string;
+          }) => localApi.importExcelFile(base64ToFile(fileBase64, filename)),
+          ...opts,
+        }),
+    },
   },
   upload: {
     importExcel: {

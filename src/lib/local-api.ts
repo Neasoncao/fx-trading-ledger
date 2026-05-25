@@ -46,6 +46,9 @@ export async function importExcelFile(file: File): Promise<{
   const workbook = XLSX.read(arrayBuffer, { type: "array" });
   const batchId = generateBatchId();
 
+  // Clear all existing data first to ensure latest upload overwrites everything
+  await clearAllLedgers();
+
   // Import 报表敞口台账
   const sheet1 = workbook.Sheets["报表敞口台账"];
   const sheet2 = workbook.Sheets["交易敞口台账"];
