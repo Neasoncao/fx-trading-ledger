@@ -49,9 +49,8 @@ export default function Home() {
   const [positionTab, setPositionTab] = useState<"closed" | "open">("open");
   const pageSize = 20;
 
-  // Boss says: close = 未平仓, open = 已平仓
-  // So for the "已平仓" tab we show open status, for "未平仓" we show close status
-  const closeStatusFilter = positionTab === "closed" ? "Close" : "Open";
+  // Position tabs: open = 未平仓, closed = 已平仓
+  const closeStatusFilter = positionTab === "open" ? "Open" : "Close";
 
   const { data: summary } = trpc.ledger.summary.useQuery({
     ledger: activeLedger.value,
@@ -352,27 +351,27 @@ export default function Home() {
               </Badge>
             </CardTitle>
 
-            {/* Position Tabs - Boss says: close = 未平仓, open = 已平仓 */}
+            {/* Position Tabs - 未平仓 = Open, 已平仓 = Close */}
             <div className="flex rounded-lg overflow-hidden border border-gray-200">
               <button
                 onClick={() => { setPositionTab("open"); setPage(1); }}
                 className={`px-4 py-2 text-sm font-medium transition-all ${
                   positionTab === "open"
-                    ? "bg-[#2e8b57] text-white"
+                    ? "bg-[#c41e3a] text-white"
                     : "bg-gray-50 text-gray-500 hover:text-gray-700"
                 }`}
               >
-                已平仓 (Open)
+                未平仓 (Open)
               </button>
               <button
                 onClick={() => { setPositionTab("closed"); setPage(1); }}
                 className={`px-4 py-2 text-sm font-medium transition-all ${
                   positionTab === "closed"
-                    ? "bg-[#c41e3a] text-white"
+                    ? "bg-[#2e8b57] text-white"
                     : "bg-gray-50 text-gray-500 hover:text-gray-700"
                 }`}
               >
-                未平仓 (Close)
+                已平仓 (Close)
               </button>
             </div>
           </div>
