@@ -222,15 +222,23 @@ export async function importExcelFile(file: File): Promise<{
   return { batchId, reportCount, tradingCount, proprietaryCount };
 }
 
-// Helper: get the PnL for a single record based on ledger type
-function getRecordPnl(item: LedgerRecord, ledger: LedgerType): number {
-  if (ledger === "trading") {
-    return Number(item.realizedPnlCny || item.unrealizedPnlCny || 0);
-  } else if (ledger === "report") {
-    return Number(item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
-  } else {
-    return Number(item.totalPnlUsd || item.realizedPnlUsd || item.unrealizedPnlUsd || 0);
-  }
+// Helper: get the PnL for a single record
+// User requirement: unrealizedPnlUsd + realizedPnlUsd as total PnL
+// If USD fields are empty (e.g. trading ledger may use CNY), fallback to CNY sum
+function getRecordPnl(item: LedgerRecord): number {
+  const usdUnrealized = Number(item.unrealizedPnlUsd || 0);
+  const usdRealized = Number(item.realizedPnlUsd || 0);
+  const usdTotal = usdUnrealized + usdRealized;
+  if (usdTotal !== 0) return usdTotal;
+
+  // Fallback for trading ledger which may use CNY fields
+  const cnyUnrealized = Number(item.unrealizedPnlCny || 0);
+  const cnyRealized = Number(item.realizedPnlCny || 0);
+  const cnyTotal = cnyUnrealized + cnyRealized;
+  if (cnyTotal !== 0) return cnyTotal;
+
+  // Last fallback for proprietary totalPnlUsd
+  return Number(item.totalPnlUsd || 0);
 }
 
 // Pie chart stats: group by a dimension, sum PnL, top 5 + others
@@ -244,7 +252,7 @@ export async function pieStats(input: {
   for (const item of all) {
     const key = (item as any)[input.groupBy];
     if (!key || String(key).trim() === "") continue; // skip empty values to avoid "未指定"
-    const pnl = getRecordPnl(item, input.ledger);
+    const pnl = getRecordPnl(item);
     map.set(key, (map.get(key) || 0) + pnl);
   }
 
@@ -273,7 +281,7 @@ export async function barStats(input: {
   const lossMap = new Map<string, number>();
 
   for (const item of all) {
-    const pnl = getRecordPnl(item, input.ledger);
+    const pnl = getRecordPnl(item);
     let key: string;
 
     if (input.groupBy === "tradeDate") {

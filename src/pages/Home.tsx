@@ -111,7 +111,6 @@ export default function Home() {
   const [activeLedger, setActiveLedger] = useState<(typeof LEDGERS)[number]>(LEDGERS[0]);
   const [page, setPage] = useState(1);
   const [positionTab, setPositionTab] = useState<"closed" | "open">("open");
-  const [groupBy, setGroupBy] = useState("entity");
   const [pieGroupBy, setPieGroupBy] = useState<"currencyPair" | "counterparty">("currencyPair");
   const [barGroupBy, setBarGroupBy] = useState<"currencyPair" | "counterparty" | "tradeDate">("currencyPair");
   const pageSize = 20;
@@ -136,11 +135,6 @@ export default function Home() {
 
   const { data: summary } = trpc.ledger.summary.useQuery({
     ledger: activeLedger.value,
-  });
-
-  const { data: stats } = trpc.ledger.statistics.useQuery({
-    ledger: activeLedger.value,
-    groupBy: groupBy as any,
   });
 
   const { data: listData } = trpc.ledger.list.useQuery({
@@ -174,7 +168,7 @@ export default function Home() {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{activeLedger.label}</h2>
             <p className="text-sm text-gray-500 mt-1">
-              实时查看名义本金、盈亏情况与分类统计分析
+              实时查看名义本金、盈亏情况与统计分析
             </p>
           </div>
         </div>
@@ -263,95 +257,8 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Statistics Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Group By Stats List */}
-        <Card className="lg:col-span-1 bg-gradient-card border-gray-200">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-[#b8860b]" />
-                分类统计分析
-              </CardTitle>
-              <Select value={groupBy} onValueChange={setGroupBy}>
-                <SelectTrigger className="w-[140px] bg-white border-gray-200 text-gray-900 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200">
-                  {GROUP_BY_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      value={opt.value}
-                      className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
-              {stats?.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 border border-gray-100 hover:border-[#b8860b]/30 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 truncate">
-                        {item.groupValue}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] border-gray-200 text-gray-500"
-                      >
-                        {item.count}笔
-                      </Badge>
-                    </div>
-                    <div className="mt-1 h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.min(100, (item.totalNotional / (summary?.maxNotional || 1)) * 100)}%`,
-                          backgroundColor: activeLedger.color,
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-gray-500">名义本金</p>
-                    <p className="text-sm font-semibold text-[#b8860b]">
-                      {formatNumber(item.totalNotional)}
-                    </p>
-                  </div>
-                  <div className="text-right flex-shrink-0 w-24">
-                    <p className="text-xs text-gray-500">
-                      {activeLedger.value === "proprietary" ? "合计盈亏" : "已实现盈亏"}
-                    </p>
-                    <p
-                      className={`text-sm font-semibold ${
-                        (activeLedger.value === "proprietary"
-                          ? item.totalPnl
-                          : item.totalRealizedPnl) >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
-                      }`}
-                    >
-                      {formatCurrency(
-                        activeLedger.value === "proprietary"
-                          ? item.totalPnl
-                          : item.totalRealizedPnl
-                      )}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
+      {/* Charts Section - Pie & Bar side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pie Chart */}
         <Card className="bg-gradient-card border-gray-200">
           <CardHeader className="pb-3">
@@ -426,10 +333,9 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Bar Chart - Profit/Loss by Dimension */}
-      <Card className="bg-gradient-card border-gray-200">
+        {/* Bar Chart */}
+        <Card className="bg-gradient-card border-gray-200">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
@@ -500,7 +406,8 @@ export default function Home() {
             )}
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {/* Data Table */}
       <Card className="bg-gradient-card border-gray-200">
