@@ -108,7 +108,7 @@ const formatPrice4 = (val: string | number | null | undefined) => {
 };
 
 export default function Home() {
-  const [activeLedger, setActiveLedger] = useState<(typeof LEDGERS)[number]>(LEDGERS[0]);
+  const [activeLedger, setActiveLedger] = useState<(typeof LEDGERS)[number]>(LEDGERS[2]);
   const [page, setPage] = useState(1);
   const [positionTab, setPositionTab] = useState<"closed" | "open">("open");
   const [pieGroupBy, setPieGroupBy] = useState<"currencyPair" | "counterparty">("currencyPair");
@@ -159,8 +159,7 @@ export default function Home() {
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3">
           <div
             className="h-3 w-3 rounded-full"
             style={{ backgroundColor: activeLedger.color }}
@@ -172,29 +171,16 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Link to="/admin">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 border-[#c41e3a]/30 text-[#c41e3a] hover:bg-[#c41e3a]/10"
-            >
-              <Shield className="h-4 w-4" />
-              后台维护
-            </Button>
-          </Link>
-        </div>
-      </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
         <Card className="bg-gradient-card border-gray-200 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">交易笔数</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">存续交易笔数</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
-                  {summary?.totalCount?.toLocaleString() ?? "-"}
+                  {summary?.openCount?.toLocaleString() ?? "-"}
                 </p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-[#c41e3a]/10 flex items-center justify-center">
@@ -208,7 +194,39 @@ export default function Home() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">名义本金合计</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">总交易笔数</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">
+                  {summary?.totalCount?.toLocaleString() ?? "-"}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                <Table2 className="h-5 w-5 text-gray-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card border-gray-200 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">持仓本金</p>
+                <p className="text-2xl font-bold text-[#b8860b] mt-1">
+                  {formatNumber(summary?.openNotional ?? 0)}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-[#b8860b]/10 flex items-center justify-center">
+                <DollarSign className="h-5 w-5 text-[#b8860b]" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card border-gray-200 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">交易本金</p>
                 <p className="text-2xl font-bold text-[#b8860b] mt-1">
                   {formatNumber(summary?.totalNotional ?? 0)}
                 </p>
@@ -224,11 +242,29 @@ export default function Home() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">未实现盈亏</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">已确认盈亏</p>
                 <p className={`text-2xl font-bold mt-1 ${
-                  (summary?.totalUnrealizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                  (summary?.realizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
                 }`}>
-                  {formatCurrency(summary?.totalUnrealizedPnl ?? 0)}
+                  {formatCurrency(summary?.realizedPnl ?? 0)}
+                </p>
+              </div>
+              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-card border-gray-200 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">持仓盈亏</p>
+                <p className={`text-2xl font-bold mt-1 ${
+                  (summary?.unrealizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                }`}>
+                  {formatCurrency(summary?.unrealizedPnl ?? 0)}
                 </p>
               </div>
               <div className="h-10 w-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -242,15 +278,15 @@ export default function Home() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider">已实现盈亏</p>
+                <p className="text-xs text-gray-500 uppercase tracking-wider">总盈亏</p>
                 <p className={`text-2xl font-bold mt-1 ${
-                  (summary?.totalRealizedPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
+                  (summary?.totalPnl ?? 0) >= 0 ? "text-green-600" : "text-red-600"
                 }`}>
-                  {formatCurrency(summary?.totalRealizedPnl ?? 0)}
+                  {formatCurrency(summary?.totalPnl ?? 0)}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
+              <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-purple-600" />
               </div>
             </div>
           </CardContent>
@@ -456,16 +492,14 @@ export default function Home() {
                 <TableRow className="border-gray-200 hover:bg-transparent">
                   <TableHead className="text-gray-500 font-medium text-xs">序号</TableHead>
                   <TableHead className="text-gray-500 font-medium text-xs">交易日期</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs">交易对手</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs">方向</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs">类型</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs">货币对</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs">到期日</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-center">交易对手</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-center">方向</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-center">类型</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-center">货币对</TableHead>
                   <TableHead className="text-gray-500 font-medium text-xs text-right">名义本金</TableHead>
                   <TableHead className="text-gray-500 font-medium text-xs text-right">开仓价格</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs text-right">权利金</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs text-right">未到期盈亏</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs text-right">已实现盈亏</TableHead>
-                  <TableHead className="text-gray-500 font-medium text-xs text-right">到期日</TableHead>
+                  <TableHead className="text-gray-500 font-medium text-xs text-right">合计盈亏</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -475,17 +509,22 @@ export default function Home() {
                     className="border-gray-100 hover:bg-gray-50/50 transition-colors"
                   >
                     <TableCell className="text-gray-700 text-sm">
-                      {item.seqNo || idx + 1}
+                      {(page - 1) * pageSize + idx + 1}
                     </TableCell>
                     <TableCell className="text-gray-700 text-sm whitespace-nowrap">
                       {item.tradeDate
                         ? new Date(item.tradeDate).toLocaleDateString("zh-CN")
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-gray-700 text-sm">
+                    <TableCell className="text-gray-700 text-sm whitespace-nowrap">
+                      {item.deliveryDate
+                        ? new Date(item.deliveryDate).toLocaleDateString("zh-CN")
+                        : "-"}
+                    </TableCell>
+                    <TableCell className="text-gray-700 text-sm text-center">
                       {item.counterparty || "-"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       <span
                         className={`text-sm font-medium ${
                           item.direction === "Buy"
@@ -498,11 +537,11 @@ export default function Home() {
                         {item.direction || "-"}
                       </span>
                     </TableCell>
-                    <TableCell className="text-gray-700 text-sm">
+                    <TableCell className="text-gray-700 text-sm text-center">
                       {item.productType || "-"}
                       {item.subType ? ` (${item.subType})` : ""}
                     </TableCell>
-                    <TableCell className="text-[#b8860b] text-sm font-medium">
+                    <TableCell className="text-[#b8860b] text-sm font-medium text-center">
                       {item.currencyPair || "-"}
                     </TableCell>
                     <TableCell className="text-right text-[#b8860b] text-sm font-mono">
@@ -515,43 +554,14 @@ export default function Home() {
                     </TableCell>
                     <TableCell
                       className={`text-right text-sm font-mono ${
-                        item.premium && Number(item.premium) < 0
-                          ? "text-red-600"
-                          : "text-green-600"
-                      }`}
-                    >
-                      {formatInteger(item.premium)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right text-sm font-mono ${
-                        item.unrealizedPnlUsd && Number(item.unrealizedPnlUsd) < 0
-                          ? "text-red-600"
-                          : item.unrealizedPnlUsd && Number(item.unrealizedPnlUsd) > 0
-                          ? "text-green-600"
-                          : "text-gray-400"
-                      }`}
-                    >
-                      {formatInteger(item.unrealizedPnlUsd ?? item.unrealizedPnlCny)}
-                    </TableCell>
-                    <TableCell
-                      className={`text-right text-sm font-mono ${
-                        item.realizedPnlUsd && Number(item.realizedPnlUsd) < 0
-                          ? "text-red-600"
-                          : item.realizedPnlUsd && Number(item.realizedPnlUsd) > 0
-                          ? "text-green-600"
-                          : item.totalPnlUsd && Number(item.totalPnlUsd) < 0
+                        item.totalPnlUsd && Number(item.totalPnlUsd) < 0
                           ? "text-red-600"
                           : item.totalPnlUsd && Number(item.totalPnlUsd) > 0
                           ? "text-green-600"
                           : "text-gray-400"
                       }`}
                     >
-                      {formatInteger(item.realizedPnlUsd ?? item.realizedPnlCny ?? item.totalPnlUsd)}
-                    </TableCell>
-                    <TableCell className="text-gray-700 text-sm whitespace-nowrap text-right">
-                      {item.deliveryDate
-                        ? new Date(item.deliveryDate).toLocaleDateString("zh-CN")
-                        : "-"}
+                      {formatInteger(item.totalPnlUsd)}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -228,22 +228,26 @@ export async function importExcelFile(file: File): Promise<{
 }
 
 // Helper: get the PnL for a single record
-// User requirement: unrealizedPnlUsd + realizedPnlUsd as total PnL
-// If USD fields are empty (e.g. trading ledger may use CNY), fallback to CNY sum
+// User requirement: use totalPnlUsd (the combined PnL column) when available.
+// For ledgers without totalPnlUsd, fallback to unrealized + realized.
 function getRecordPnl(item: LedgerRecord): number {
+  // 1. Try totalPnlUsd first (proprietary ledger combined column)
+  const totalUsd = Number(item.totalPnlUsd || 0);
+  if (totalUsd !== 0) return totalUsd;
+
+  // 2. Report ledger: unrealizedPnlUsd + realizedPnlUsd
   const usdUnrealized = Number(item.unrealizedPnlUsd || 0);
   const usdRealized = Number(item.realizedPnlUsd || 0);
   const usdTotal = usdUnrealized + usdRealized;
   if (usdTotal !== 0) return usdTotal;
 
-  // Fallback for trading ledger which may use CNY fields
+  // 3. Trading ledger: CNY fields
   const cnyUnrealized = Number(item.unrealizedPnlCny || 0);
   const cnyRealized = Number(item.realizedPnlCny || 0);
   const cnyTotal = cnyUnrealized + cnyRealized;
   if (cnyTotal !== 0) return cnyTotal;
 
-  // Last fallback for proprietary totalPnlUsd
-  return Number(item.totalPnlUsd || 0);
+  return 0;
 }
 
 // Pie chart stats: group by a dimension, sum PnL, top 5 + others
@@ -443,60 +447,31 @@ export async function ledgerStatistics(input: {
 
 export async function ledgerSummary(input: { ledger: LedgerType }) {
   const all = await getAll(input.ledger);
+
+  const openItems = all.filter((i) => i.closeStatus === "Open");
+  const closeItems = all.filter((i) => i.closeStatus === "Close");
+
+  const openCount = openItems.length;
   const totalCount = all.length;
-  const totalNotional = all.reduce(
-    (sum, i) => sum + Number(i.notionalLocal || 0),
-    0
-  );
-  const avgNotional = totalCount > 0 ? totalNotional / totalCount : 0;
-  const maxNotional = all.reduce(
-    (max, i) => Math.max(max, Number(i.notionalLocal || 0)),
-    0
-  );
 
-  let totalUnrealizedPnl = 0;
-  let totalRealizedPnl = 0;
-  let totalPremium = 0;
+  const openNotional = openItems.reduce((sum, i) => sum + Number(i.notionalLocal || 0), 0);
+  const totalNotional = all.reduce((sum, i) => sum + Number(i.notionalLocal || 0), 0);
 
-  if (input.ledger === "report") {
-    totalUnrealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.unrealizedPnlUsd || 0),
-      0
-    );
-    totalRealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.realizedPnlUsd || 0),
-      0
-    );
-  } else if (input.ledger === "trading") {
-    totalUnrealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.unrealizedPnlCny || 0),
-      0
-    );
-    totalRealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.realizedPnlCny || 0),
-      0
-    );
-  } else {
-    totalUnrealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.unrealizedPnlUsd || 0),
-      0
-    );
-    totalRealizedPnl = all.reduce(
-      (sum, i) => sum + Number(i.totalPnlUsd || 0),
-      0
-    );
-  }
-
-  totalPremium = all.reduce((sum, i) => sum + Number(i.premium || 0), 0);
+  // All PnL stats use getRecordPnl (totalPnlUsd when available)
+  const openPnl = openItems.reduce((sum, i) => sum + getRecordPnl(i), 0);
+  const closePnl = closeItems.reduce((sum, i) => sum + getRecordPnl(i), 0);
+  const totalPnl = all.reduce((sum, i) => sum + getRecordPnl(i), 0);
 
   return {
+    openCount,
     totalCount,
+    openNotional,
     totalNotional,
-    avgNotional,
-    maxNotional,
-    totalUnrealizedPnl,
-    totalRealizedPnl,
-    totalPremium,
+    // 持仓盈亏 = open positions total PnL
+    unrealizedPnl: openPnl,
+    // 已确认盈亏 = closed positions total PnL
+    realizedPnl: closePnl,
+    totalPnl,
   };
 }
 
@@ -524,3 +499,6 @@ export async function ledgerFilterOptions(input: { ledger: LedgerType }) {
     callPuts: getDistinct("callPut"),
   };
 }
+
+// Re-export clearAllLedgers for use by trpc provider
+export { clearAllLedgers } from "./db";
