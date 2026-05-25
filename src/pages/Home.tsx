@@ -157,7 +157,23 @@ export default function Home() {
   const totalPages = listData ? Math.ceil(listData.total / pageSize) : 0;
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto">
+    <div className="space-y-6 max-w-[1600px] mx-auto relative">
+      {/* Decorative top accent bar */}
+      <div className="fixed top-0 left-0 right-0 h-1 z-50"
+        style={{ background: "linear-gradient(90deg, #c41e3a 0%, #b8860b 50%, #c41e3a 100%)" }}
+      />
+
+      {/* Decorative background elements */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full opacity-[0.03]"
+          style={{ background: "radial-gradient(circle, #c41e3a, transparent 70%)" }}
+        />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full opacity-[0.03]"
+          style={{ background: "radial-gradient(circle, #b8860b, transparent 70%)" }}
+        />
+      </div>
+
+      <div className="relative z-10 space-y-6">
       {/* Page Header */}
       <div className="flex items-center gap-3">
           <div
@@ -276,159 +292,165 @@ export default function Home() {
       </div>
 
       {/* Charts Section - Pie & Bar side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Pie Chart */}
-        <Card className="bg-gradient-card border-gray-200">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-                <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
-                盈亏分布
-              </CardTitle>
-              <Select
-                value={pieGroupBy}
-                onValueChange={(v) => setPieGroupBy(v as any)}
-              >
-                <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-white border-gray-200">
-                  {PIE_OPTIONS.map((opt) => (
-                    <SelectItem
-                      key={opt.value}
-                      value={opt.value}
-                      className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
-                    >
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[320px]">
-              {pieData && pieData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={100}
-                      paddingAngle={2}
-                      dataKey="value"
-                      nameKey="name"
-                      label={({ name, percent }) =>
-                        `${name}: ${(percent * 100).toFixed(0)}%`
-                      }
-                    >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: number, name: string) => [
-                        formatCurrency(value),
-                        name,
-                      ]}
-                      contentStyle={{
-                        background: "#fff",
-                        border: "1px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: "12px",
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="flex items-center justify-center h-full text-gray-400">
-                  暂无数据
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Bar Chart */}
-        <Card className="bg-gradient-card border-gray-200">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
-              <BarChartIcon className="h-5 w-5 text-[#b8860b]" />
-              盈亏柱状分析
-            </CardTitle>
-            <Select
-              value={barGroupBy}
-              onValueChange={(v) => setBarGroupBy(v as any)}
-            >
-              <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-gray-200">
-                {BAR_OPTIONS.map((opt) => (
-                  <SelectItem
-                    key={opt.value}
-                    value={opt.value}
-                    className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+      {activeLedger.value !== "trading" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Pie Chart - hidden for report & trading */}
+          {activeLedger.value === "proprietary" && (
+            <Card className="bg-gradient-card border-gray-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+                    <PieChartIcon className="h-5 w-5 text-[#b8860b]" />
+                    盈亏分布
+                  </CardTitle>
+                  <Select
+                    value={pieGroupBy}
+                    onValueChange={(v) => setPieGroupBy(v as any)}
                   >
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[360px]">
-            {barData && barData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                  <XAxis 
-                    dataKey="key" 
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                    angle={barGroupBy === "tradeDate" ? -45 : 0}
-                    textAnchor={barGroupBy === "tradeDate" ? "end" : "middle"}
-                    height={barGroupBy === "tradeDate" ? 60 : 30}
-                  />
-                  <YAxis 
-                    tick={{ fontSize: 11, fill: "#6b7280" }}
-                    tickFormatter={(v) => formatNumber(v)}
-                  />
-                  <Tooltip
-                    formatter={(value: number) => [
-                      formatCurrency(value),
-                      "合计盈亏",
-                    ]}
-                    contentStyle={{
-                      background: "#fff",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                    }}
-                  />
-                  <Bar dataKey="value" name="合计盈亏" radius={[4, 4, 0, 0]}>
-                    {barData.map((entry: any, index: number) => (
-                      <Cell
-                        key={`cell-${index}`}
-                        fill={entry.value >= 0 ? "#c41e3a" : "#2e8b57"}
-                      />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400">
-                暂无数据
-              </div>
-            )}
-          </div>
-        </CardContent>
-        </Card>
-      </div>
+                    <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200">
+                      {PIE_OPTIONS.map((opt) => (
+                        <SelectItem
+                          key={opt.value}
+                          value={opt.value}
+                          className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+                        >
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[320px]">
+                  {pieData && pieData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={100}
+                          paddingAngle={2}
+                          dataKey="value"
+                          nameKey="name"
+                          label={({ name, percent }) =>
+                            `${name}: ${(percent * 100).toFixed(0)}%`
+                          }
+                        >
+                          {pieData.map((_, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number, name: string) => [
+                            formatCurrency(value),
+                            name,
+                          ]}
+                          contentStyle={{
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                          }}
+                        />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      暂无数据
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Bar Chart - hidden for trading only */}
+          {activeLedger.value !== "trading" && (
+            <Card className="bg-gradient-card border-gray-200">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-gray-900 text-lg flex items-center gap-2">
+                    <BarChartIcon className="h-5 w-5 text-[#b8860b]" />
+                    盈亏柱状分析
+                  </CardTitle>
+                  <Select
+                    value={barGroupBy}
+                    onValueChange={(v) => setBarGroupBy(v as any)}
+                  >
+                    <SelectTrigger className="w-[120px] bg-white border-gray-200 text-gray-900 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-white border-gray-200">
+                      {BAR_OPTIONS.map((opt) => (
+                        <SelectItem
+                          key={opt.value}
+                          value={opt.value}
+                          className="text-gray-700 focus:bg-gray-100 focus:text-gray-900 text-xs"
+                        >
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[360px]">
+                  {barData && barData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={barData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="key"
+                          tick={{ fontSize: 11, fill: "#6b7280" }}
+                          angle={barGroupBy === "tradeDate" ? -45 : 0}
+                          textAnchor={barGroupBy === "tradeDate" ? "end" : "middle"}
+                          height={barGroupBy === "tradeDate" ? 60 : 30}
+                        />
+                        <YAxis
+                          tick={{ fontSize: 11, fill: "#6b7280" }}
+                          tickFormatter={(v) => formatNumber(v)}
+                        />
+                        <Tooltip
+                          formatter={(value: number) => [
+                            formatCurrency(value),
+                            "合计盈亏",
+                          ]}
+                          contentStyle={{
+                            background: "#fff",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: "8px",
+                            fontSize: "12px",
+                          }}
+                        />
+                        <Bar dataKey="value" name="合计盈亏" radius={[4, 4, 0, 0]}>
+                          {barData.map((entry: any, index: number) => (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.value >= 0 ? "#c41e3a" : "#2e8b57"}
+                            />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400">
+                      暂无数据
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Data Table */}
       <Card className="bg-gradient-card border-gray-200">
@@ -557,7 +579,7 @@ export default function Home() {
           {/* Pagination */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
             <p className="text-xs text-gray-500">
-              显示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, listData?.total ?? 0)} 条，
+              显示 {(page - 1) * pageSize + 1} - {Math.min(page * pageSize, listData?.total ?? 0)} 条,
               共 {listData?.total ?? 0} 条
             </p>
             <div className="flex items-center gap-2">
@@ -587,6 +609,7 @@ export default function Home() {
       </Card>
 
       {/* Footer */}
+      </div>
       <footer className="border-t border-gray-200 bg-white mt-8">
         <div className="max-w-[1600px] mx-auto px-6 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -608,15 +631,15 @@ export default function Home() {
               <div className="space-y-2 text-sm text-gray-600">
                 <p className="flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-400" />
-                  联系人：曹愻川
+                  联系人:曹愻川
                 </p>
                 <p className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-gray-400" />
-                  电话：13564016600
+                  电话:13564016600
                 </p>
                 <p className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-gray-400" />
-                  工作时间：周一至周五 9:00-18:00
+                  工作时间:周一至周五 9:00-18:00
                 </p>
               </div>
             </div>
@@ -628,7 +651,7 @@ export default function Home() {
               </h3>
               <div className="space-y-2 text-sm text-gray-500">
                 <p>© 2026 紫金投资 ZiJin Investment. 保留所有权利。</p>
-                <p>本系统数据仅供内部管理使用，未经授权不得对外披露。</p>
+                <p>本系统数据仅供内部管理使用,未经授权不得对外披露。</p>
                 <p>外汇交易台账管理系统 v1.0</p>
               </div>
             </div>
@@ -636,7 +659,7 @@ export default function Home() {
 
           <div className="mt-6 pt-4 border-t border-gray-100 text-center">
             <p className="text-xs text-gray-400">
-              技术支持：OpenClaw Agent | 数据安全由本地存储保障
+              技术支持:OpenClaw Agent | 数据安全由本地存储保障
             </p>
           </div>
         </div>
