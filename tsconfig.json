@@ -7,9 +7,6 @@
     {
       "path": "./tsconfig.node.json"
     },
-    {
-      "path": "./tsconfig.server.json"
-    }
   ],
   "compilerOptions": {
     "baseUrl": ".",
@@ -19,9 +16,6 @@
       ],
       "@contracts/*": [
         "./contracts/*"
-      ],
-      "@db/*": [
-        "./db/*"
       ]
     }
   }

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/hooks/useAuth";
 import {
   TrendingUp,
@@ -14,24 +13,7 @@ import {
   Eye,
   EyeOff,
   ArrowLeft,
-  Globe,
 } from "lucide-react";
-
-function getOAuthUrl() {
-  const portalUrl = import.meta.env.VITE_KIMI_AUTH_URL;
-  const appID = import.meta.env.VITE_APP_ID;
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
-
-  const url = new URL(`${portalUrl}/api/oauth/authorize`);
-  url.searchParams.set("client_id", appID);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "profile");
-  url.searchParams.set("state", state);
-
-  return url.toString();
-}
 
 export default function Login() {
   const navigate = useNavigate();
@@ -48,12 +30,13 @@ export default function Login() {
   const [regUsername, setRegUsername] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regName, setRegName] = useState("");
+  const [regAdminCode, setRegAdminCode] = useState("");
   const [regError, setRegError] = useState("");
 
   const loginMutation = trpc.localAuth.login.useMutation({
     onSuccess: (data) => {
       localStorage.setItem("local_auth_token", data.token);
-      window.location.href = "/";
+      window.location.href = window.location.pathname + "#/";
     },
     onError: (err) => {
       setLoginError(err.message);
@@ -63,7 +46,7 @@ export default function Login() {
   const registerMutation = trpc.localAuth.register.useMutation({
     onSuccess: (data) => {
       localStorage.setItem("local_auth_token", data.token);
-      window.location.href = "/";
+      window.location.href = window.location.pathname + "#/";
     },
     onError: (err) => {
       setRegError(err.message);
@@ -100,6 +83,7 @@ export default function Login() {
       username: regUsername,
       password: regPassword,
       name: regName || undefined,
+      adminCode: regAdminCode || undefined,
     });
   };
 
@@ -129,23 +113,6 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {/* OAuth Login */}
-            <Button
-              onClick={() => {
-                window.location.href = getOAuthUrl();
-              }}
-              className="w-full gap-2 bg-[#1a1a1a] hover:bg-[#2a2a2a] text-[#f0d78c] border border-[#d4a843]/30 hover:border-[#d4a843]/60 transition-all"
-            >
-              <Globe className="h-4 w-4" />
-              Portal OAuth 登录
-            </Button>
-
-            <div className="flex items-center gap-3">
-              <Separator className="flex-1 bg-[#2a2a2a]" />
-              <span className="text-xs text-[#8b7355]">或使用账号密码</span>
-              <Separator className="flex-1 bg-[#2a2a2a]" />
-            </div>
-
             {/* Local Auth Tabs */}
             <Tabs value={tab} onValueChange={setTab}>
               <TabsList className="w-full bg-[#1a1a1a] border border-[#2a2a2a]">
@@ -245,6 +212,14 @@ export default function Login() {
                         <Eye className="h-4 w-4" />
                       )}
                     </button>
+                  </div>
+                  <div>
+                    <Input
+                      placeholder="管理员邀请码 (可选，首个用户自动成为管理员)"
+                      value={regAdminCode}
+                      onChange={(e) => setRegAdminCode(e.target.value)}
+                      className="bg-[#1a1a1a] border-[#2a2a2a] text-[#d4d4d4] placeholder:text-[#555] focus:border-[#d4a843]"
+                    />
                   </div>
                   {regError && (
                     <p className="text-xs text-red-400">{regError}</p>

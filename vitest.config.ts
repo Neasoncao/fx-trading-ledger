@@ -9,11 +9,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(templateRoot, "src"),
       "@contracts": path.resolve(templateRoot, "contracts"),
-      "@assets": path.resolve(templateRoot, "attached_assets"),
     },
   },
   test: {
-    environment: "node",
-    include: ["api/**/*.test.ts", "api/**/*.spec.ts"],
+    environment: "jsdom",
+    include: ["src/**/*.test.ts", "src/**/*.spec.ts"],
   },
 });

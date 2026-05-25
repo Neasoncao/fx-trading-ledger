@@ -14,14 +14,6 @@ export function useAuth() {
   const utils = trpc.useUtils();
 
   const {
-    data: oauthUser,
-    isLoading: oauthLoading,
-  } = trpc.auth.me.useQuery(undefined, {
-    staleTime: 1000 * 60 * 5,
-    retry: false,
-  });
-
-  const {
     data: localUser,
     isLoading: localLoading,
   } = trpc.localAuth.me.useQuery(undefined, {
@@ -36,16 +28,6 @@ export function useAuth() {
   });
 
   const user: UnifiedUser | null = useMemo(() => {
-    if (oauthUser) {
-      return {
-        id: oauthUser.id,
-        name: oauthUser.name,
-        email: oauthUser.email,
-        avatar: oauthUser.avatar,
-        role: oauthUser.role as "user" | "admin",
-        authType: "oauth" as const,
-      };
-    }
     if (localUser) {
       return {
         id: localUser.id,
@@ -55,16 +37,15 @@ export function useAuth() {
       };
     }
     return null;
-  }, [oauthUser, localUser]);
+  }, [localUser]);
 
-  const isLoading = oauthLoading || localLoading;
+  const isLoading = localLoading;
   const isAuthenticated = !!user;
   const isAdmin = user?.role === "admin";
 
   const logout = useCallback(() => {
-    // Clear local auth token
     localStorage.removeItem("local_auth_token");
-    // Call OAuth logout
+    localStorage.removeItem("local_user");
     logoutMutation.mutate(undefined, {
       onSettled: () => {
         window.location.reload();

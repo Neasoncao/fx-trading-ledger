@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { trpc } from "@/providers/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +58,25 @@ export default function Admin() {
       window.location.reload();
     },
   });
+
+  const [recordCounts, setRecordCounts] = useState({ report: 0, trading: 0, proprietary: 0 });
+
+  useEffect(() => {
+    async function loadCounts() {
+      const { getAll } = await import("@/lib/db");
+      const [report, trading, proprietary] = await Promise.all([
+        getAll("report"),
+        getAll("trading"),
+        getAll("proprietary"),
+      ]);
+      setRecordCounts({
+        report: report.length,
+        trading: trading.length,
+        proprietary: proprietary.length,
+      });
+    }
+    loadCounts();
+  }, [uploadResult]);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
@@ -310,19 +329,19 @@ export default function Admin() {
               </div>
 
               <div className="mt-4 p-4 rounded-lg bg-[#c41e3a]/5 border border-[#c41e3a]/20">
-                <h4 className="text-sm font-medium text-[#c41e3a] mb-2">系统状态</h4>
+                <h4 className="text-sm font-medium text-[#c41e3a] mb-2">本地数据状态</h4>
                 <div className="space-y-2 text-xs text-[#8b7355]">
                   <div className="flex justify-between">
-                    <span>数据库连接</span>
-                    <span className="text-green-400">正常</span>
+                    <span>报表敞口记录</span>
+                    <span className="text-green-400">{recordCounts.report} 条</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>API 服务</span>
-                    <span className="text-green-400">运行中</span>
+                    <span>交易敞口记录</span>
+                    <span className="text-green-400">{recordCounts.trading} 条</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>认证系统</span>
-                    <span className="text-green-400">已启用</span>
+                    <span>自营交易记录</span>
+                    <span className="text-green-400">{recordCounts.proprietary} 条</span>
                   </div>
                 </div>
               </div>
