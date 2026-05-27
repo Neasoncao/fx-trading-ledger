@@ -137,10 +137,12 @@ export default function Home() {
   useEffect(() => {
     // 1. Catch-up: if today's snapshot is missing, save one immediately on page load
     const today = new Date().toISOString().split("T")[0];
-    localApi.getSnapshot("proprietary", today).then((snap) => {
+    getSnapshot("proprietary", today).then((snap) => {
       if (!snap) {
         saveSnapshotMutation.mutate();
       }
+    }).catch(() => {
+      // ignore: snapshot table may not exist yet
     });
 
     // 2. Schedule the next 15:00 snapshot (Beijing time = UTC+8)
