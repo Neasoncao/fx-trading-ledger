@@ -15,27 +15,27 @@ import {
 
 function toDate(val: unknown): string | null {
   if (!val || val === "NaT" || val === "null" || val === "undefined") return null;
+  
+  let d: Date | null = null;
+  
   if (val instanceof Date) {
     if (val.getFullYear() < 1900) return null;
-    return val.toISOString();
-  }
-  if (typeof val === "number") {
-    // Excel date serial numbers are typically in range 1-100000 (1900-2200)
-    // Financial figures like notionals/prices are usually >1M or <0.001, 
-    // or very small integers (1-100). Use range check to avoid misclassifying.
+    d = val;
+  } else if (typeof val === "number") {
     if (val > 30000 && val < 100000) {
-      // Excel epoch is 1899-12-30 (with 1900 leap year bug compatibility)
       const excelEpoch = new Date(Date.UTC(1899, 11, 30));
-      const jsDate = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
-      if (!isNaN(jsDate.getTime()) && jsDate.getFullYear() >= 1900) return jsDate.toISOString();
+      d = new Date(excelEpoch.getTime() + val * 24 * 60 * 60 * 1000);
     }
-    return null;
+  } else {
+    const s = String(val).trim();
+    if (!s) return null;
+    d = new Date(s);
   }
-  const s = String(val).trim();
-  if (!s) return null;
-  const d = new Date(s);
-  if (isNaN(d.getTime()) || d.getFullYear() < 1900) return null;
-  return d.toISOString();
+  
+  if (!d || isNaN(d.getTime()) || d.getFullYear() < 1900) return null;
+  
+  // Normalize to UTC midnight — strip time so timezone never shifts the date
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
 }
 
 function isEmptyRow(row: unknown[]): boolean {

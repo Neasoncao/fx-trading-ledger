@@ -57,6 +57,17 @@ const LEDGERS = [
 
 const COLORS = ["#c41e3a", "#b8860b", "#2e8b57", "#1e90ff", "#ff6b35", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b", "#6366f1"];
 
+// Safe UTC date formatter — avoids timezone shifting the displayed date
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "-";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "-";
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}/${m}/${day}`;
+}
+
 const PIE_OPTIONS = [
   { value: "currencyPair", label: "货币对" },
   { value: "counterparty", label: "交易对手" },
@@ -680,12 +691,12 @@ export default function Home() {
                     </TableCell>
                     <TableCell className="text-gray-700 text-sm whitespace-nowrap">
                       {item.tradeDate
-                        ? new Date(item.tradeDate).toLocaleDateString("zh-CN")
+                        ? formatDate(item.tradeDate)
                         : "-"}
                     </TableCell>
                     <TableCell className="text-gray-700 text-sm whitespace-nowrap">
                       {item.deliveryDate
-                        ? new Date(item.deliveryDate).toLocaleDateString("zh-CN")
+                        ? formatDate(item.deliveryDate)
                         : "-"}
                     </TableCell>
                     <TableCell className="text-gray-700 text-sm text-center">
