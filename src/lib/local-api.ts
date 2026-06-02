@@ -34,8 +34,8 @@ function toDate(val: unknown): string | null {
   
   if (!d || isNaN(d.getTime()) || d.getFullYear() < 1900) return null;
   
-  // Normalize to UTC midnight — strip time so timezone never shifts the date
-  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())).toISOString();
+  // Normalize to UTC midnight — use UTC getters so timezone never shifts the date
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
 }
 
 function isEmptyRow(row: unknown[]): boolean {
