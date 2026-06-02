@@ -16,9 +16,9 @@ import {
 } from "lucide-react";
 
 const LEDGERS = [
-  { value: "report", label: "报表敞口台账", color: "#c41e3a" },
-  { value: "trading", label: "交易敞口台账", color: "#b8860b" },
-  { value: "proprietary", label: "自营交易台账", color: "#2e8b57" },
+  { value: "report", label: "结汇套保", color: "#c41e3a" },
+  { value: "trading", label: "购汇套保", color: "#b8860b" },
+  { value: "proprietary", label: "自营交易", color: "#2e8b57" },
 ];
 
 export function MainLayout() {

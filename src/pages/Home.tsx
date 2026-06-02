@@ -50,9 +50,9 @@ import {
 } from "recharts";
 
 const LEDGERS = [
-  { value: "report" as const, label: "报表敞口台账", color: "#c41e3a" },
-  { value: "trading" as const, label: "交易敞口台账", color: "#b8860b" },
-  { value: "proprietary" as const, label: "自营交易台账", color: "#2e8b57" },
+  { value: "report" as const, label: "结汇套保", color: "#c41e3a" },
+  { value: "trading" as const, label: "购汇套保", color: "#b8860b" },
+  { value: "proprietary" as const, label: "自营交易", color: "#2e8b57" },
 ];
 
 const COLORS = ["#c41e3a", "#b8860b", "#2e8b57", "#1e90ff", "#ff6b35", "#8b5cf6", "#ec4899", "#10b981", "#f59e0b", "#6366f1"];

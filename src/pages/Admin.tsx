@@ -208,7 +208,7 @@ export default function Admin() {
               </Button>
             </div>
             <p className="text-xs text-gray-500">
-              支持 .xlsx / .xls 格式，需包含工作表：报表敞口台账、交易敞口台账、自营交易台账
+              支持 .xlsx / .xls 格式，需包含工作表：Hedge-BS、Hedge-Trade、Trading
             </p>
           </div>
 
@@ -229,15 +229,15 @@ export default function Admin() {
                 <p className="text-sm">批次号：{result.batchId}</p>
                 <div className="grid grid-cols-3 gap-2 mt-2">
                   <div className="bg-white rounded-lg p-3 text-center border border-green-100">
-                    <p className="text-xs text-gray-500">报表敞口台账</p>
+                    <p className="text-xs text-gray-500">结汇套保</p>
                     <p className="text-lg font-bold text-[#c41e3a]">{result.reportCount} 条</p>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center border border-green-100">
-                    <p className="text-xs text-gray-500">交易敞口台账</p>
+                    <p className="text-xs text-gray-500">购汇套保</p>
                     <p className="text-lg font-bold text-[#b8860b]">{result.tradingCount} 条</p>
                   </div>
                   <div className="bg-white rounded-lg p-3 text-center border border-green-100">
-                    <p className="text-xs text-gray-500">自营交易台账</p>
+                    <p className="text-xs text-gray-500">自营交易</p>
                     <p className="text-lg font-bold text-green-600">{result.proprietaryCount} 条</p>
                   </div>
                 </div>

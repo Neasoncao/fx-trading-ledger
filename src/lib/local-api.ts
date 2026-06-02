@@ -83,14 +83,14 @@ export async function importExcelFile(file: File): Promise<{
   // Clear all existing data first to ensure latest upload overwrites everything
   await clearAllLedgers();
 
-  // Import 报表敞口台账
-  const sheet1 = workbook.Sheets["报表敞口台账"];
-  const sheet2 = workbook.Sheets["交易敞口台账"];
-  const sheet3 = workbook.Sheets["自营交易台账"];
+  // Import Hedge-BS (结汇套保)
+  const sheet1 = workbook.Sheets["Hedge-BS"];
+  const sheet2 = workbook.Sheets["Hedge-Trade"];
+  const sheet3 = workbook.Sheets["Trading"];
 
   if (!sheet1 && !sheet2 && !sheet3) {
     throw new Error(
-      "未找到有效的工作表，请确保文件包含：报表敞口台账、交易敞口台账、自营交易台账"
+      "未找到有效的工作表，请确保文件包含：Hedge-BS、Hedge-Trade、Trading"
     );
   }
 
@@ -131,13 +131,14 @@ export async function importExcelFile(file: File): Promise<{
       unrealizedPnlUsd: toDecimal(row[25]),
       realizedPnlLocal: toDecimal(row[26]),
       realizedPnlUsd: toDecimal(row[27]),
+      totalPnlUsd: toDecimal(row[28]),
       batchId,
     }));
     await addRecords("report", records);
     reportCount = records.length;
   }
 
-  // Import 交易敞口台账
+  // Import Hedge-Trade (购汇套保)
   if (sheet2) {
     const data2 = XLSX.utils.sheet_to_json<unknown[]>(sheet2, { header: 1, raw: true, defval: null });
     const rows2 = data2
@@ -176,16 +177,17 @@ export async function importExcelFile(file: File): Promise<{
       closeDate: toDate(row[29]),
       closePrice: toDecimal(row[30]),
       unrealizedPnlLocal: toDecimal(row[31]),
-      unrealizedPnlCny: toDecimal(row[32]),
+      unrealizedPnlUsd: toDecimal(row[32]),
       realizedPnlLocal: toDecimal(row[33]),
-      realizedPnlCny: toDecimal(row[34]),
+      realizedPnlUsd: toDecimal(row[34]),
+      totalPnlUsd: toDecimal(row[35]),
       batchId,
     }));
     await addRecords("trading", records);
     tradingCount = records.length;
   }
 
-  // Import 自营交易台账
+  // Import Trading (自营交易)
   if (sheet3) {
     const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1, raw: true, defval: null });
     const rows3 = data3
@@ -222,51 +224,7 @@ export async function importExcelFile(file: File): Promise<{
       futurePremium: toDecimal(row[27]),
       realizedPnlLocal: toDecimal(row[28]),
       realizedPnlUsd: toDecimal(row[29]),
-      totalPnlUsd: toDecimal(row[30]),
-      batchId,
-    }));
-    await addRecords("proprietary", records);
-    proprietaryCount = records.length;
-  }
-
-  // Import 自营交易台账
-  if (sheet3) {
-    const data3 = XLSX.utils.sheet_to_json<unknown[]>(sheet3, { header: 1, raw: true, defval: null });
-    const rows3 = data3
-      .slice(1)
-      .filter((row) => row[0] !== undefined && row[0] !== "" && !isEmptyRow(row));
-    const records: Omit<LedgerRecord, "id">[] = rows3.map((row) => ({
-      seqNo: toInt(row[0]),
-      tradeDate: toDate(row[1]),
-      entity: toString(row[2]),
-      trader: toString(row[3]),
-      counterparty: toString(row[4]),
-      expiryStatus: toString(row[5]),
-      closeStatus: toString(row[6]),
-      priceCurrency: toString(row[7]),
-      settleCurrency: toString(row[8]),
-      pricingDate: toDate(row[9]),
-      premiumDate: toDate(row[10]),
-      deliveryDate: toDate(row[11]),
-      direction: toString(row[12]),
-      productType: toString(row[13]),
-      currencyPair: toString(row[14]),
-      subType: toString(row[15]),
-      callPut: toString(row[16]),
-      notionalLocal: toDecimal(row[17]),
-      notionalUsd: toDecimal(row[18]),
-      barrier1: toDecimal(row[19]),
-      barrier2: toDecimal(row[20]),
-      strikePrice: toDecimal(row[21]),
-      premium: toDecimal(row[22]),
-      closeDate: toDate(row[23]),
-      closePrice: toDecimal(row[24]),
-      unrealizedPnlLocal: toDecimal(row[25]),
-      unrealizedPnlUsd: toDecimal(row[26]),
-      futurePremium: toDecimal(row[27]),
-      realizedPnlLocal: toDecimal(row[28]),
-      realizedPnlUsd: toDecimal(row[29]),
-      totalPnlUsd: toDecimal(row[30]),
+      totalPnlUsd: toDecimal(row[29]),
       batchId,
     }));
     await addRecords("proprietary", records);
@@ -280,17 +238,18 @@ export async function importExcelFile(file: File): Promise<{
 // User requirement: use totalPnlUsd (the combined PnL column) when available.
 // For ledgers without totalPnlUsd, fallback to unrealized + realized.
 function getRecordPnl(item: LedgerRecord): number {
-  // 1. Try totalPnlUsd first (proprietary ledger combined column)
-  const totalUsd = Number(item.totalPnlUsd || 0);
-  if (totalUsd !== 0) return totalUsd;
+  // 1. Always use totalPnlUsd (combined column) when available, even if it's 0
+  if (item.totalPnlUsd != null && item.totalPnlUsd !== "") {
+    return Number(item.totalPnlUsd);
+  }
 
-  // 2. Report ledger: unrealizedPnlUsd + realizedPnlUsd
+  // 2. Fallback: unrealizedPnlUsd + realizedPnlUsd
   const usdUnrealized = Number(item.unrealizedPnlUsd || 0);
   const usdRealized = Number(item.realizedPnlUsd || 0);
   const usdTotal = usdUnrealized + usdRealized;
   if (usdTotal !== 0) return usdTotal;
 
-  // 3. Trading ledger: CNY fields
+  // 3. Legacy fallback: CNY fields
   const cnyUnrealized = Number(item.unrealizedPnlCny || 0);
   const cnyRealized = Number(item.realizedPnlCny || 0);
   const cnyTotal = cnyUnrealized + cnyRealized;
@@ -439,36 +398,7 @@ export async function ledgerStatistics(input: {
 
     let totalUnrealizedPnl = 0;
     let totalRealizedPnl = 0;
-    let totalPnl = 0;
-
-    if (input.ledger === "report") {
-      totalUnrealizedPnl = items.reduce(
-        (sum, i) => sum + Number(i.unrealizedPnlUsd || 0),
-        0
-      );
-      totalRealizedPnl = items.reduce(
-        (sum, i) => sum + Number(i.realizedPnlUsd || 0),
-        0
-      );
-    } else if (input.ledger === "trading") {
-      totalUnrealizedPnl = items.reduce(
-        (sum, i) => sum + Number(i.unrealizedPnlCny || 0),
-        0
-      );
-      totalRealizedPnl = items.reduce(
-        (sum, i) => sum + Number(i.realizedPnlCny || 0),
-        0
-      );
-    } else {
-      totalUnrealizedPnl = items.reduce(
-        (sum, i) => sum + Number(i.unrealizedPnlUsd || 0),
-        0
-      );
-      totalPnl = items.reduce(
-        (sum, i) => sum + Number(i.totalPnlUsd || 0),
-        0
-      );
-    }
+    const totalPnl = items.reduce((sum, i) => sum + getRecordPnl(i), 0);
 
     return {
       groupValue,
